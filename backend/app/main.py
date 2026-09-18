@@ -1,8 +1,11 @@
+import asyncio
+
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 
 from . import analytics, google_oauth
+from .background import auto_sync_enabled, periodic_sync
 from .connectors.registry import diagnostics
 from .connectors.wordpress import WordPressConnector
 from .db import connector_states, initialize
@@ -24,9 +27,27 @@ app.add_middleware(
 )
 
 
+_sync_task: asyncio.Task | None = None
+
+
 @app.on_event("startup")
 def startup() -> None:
+    global _sync_task
     initialize()
+    if auto_sync_enabled():
+        _sync_task = asyncio.create_task(periodic_sync())
+
+
+@app.on_event("shutdown")
+async def shutdown() -> None:
+    global _sync_task
+    if _sync_task:
+        _sync_task.cancel()
+        try:
+            await _sync_task
+        except asyncio.CancelledError:
+            pass
+        _sync_task = None
 
 
 @app.get("/api/health")
