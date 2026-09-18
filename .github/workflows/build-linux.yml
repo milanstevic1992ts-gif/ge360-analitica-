@@ -145,17 +145,17 @@ jobs:
 
       - name: Build DEB and portable archive
         env:
-          GE360_VERSION: "0.6.0"
+          GE360_VERSION: "0.6.1"
           GE360_ARCH: amd64
         run: |
           chmod +x scripts/build-linux-package.sh
           scripts/build-linux-package.sh
-          dpkg-deb --info dist/ge360-analitica_0.6.0_amd64.deb
-          dpkg-deb --contents dist/ge360-analitica_0.6.0_amd64.deb | head -80
+          dpkg-deb --info dist/ge360-analitica_0.6.1_amd64.deb
+          dpkg-deb --contents dist/ge360-analitica_0.6.1_amd64.deb | head -80
 
       - name: Test DEB install and in-place upgrade persistence
         run: |
-          sudo dpkg -i dist/ge360-analitica_0.6.0_amd64.deb
+          sudo dpkg -i dist/ge360-analitica_0.6.1_amd64.deb
           /usr/bin/ge360-analitica version
           test -f /etc/ge360-analitica/ge360.env
           test -f /lib/systemd/system/ge360-analitica.service
@@ -171,7 +171,7 @@ jobs:
           sudo chmod 600 /var/lib/ge360-analitica/secrets/runtime_config.json
 
           # Reinstalla/aggiorna sopra l'installazione esistente.
-          sudo dpkg -i dist/ge360-analitica_0.6.0_amd64.deb
+          sudo dpkg -i dist/ge360-analitica_0.6.1_amd64.deb
 
           sudo grep "persistent-db-marker" /var/lib/ge360-analitica/upgrade-marker
           sudo grep "user-setting-must-survive" /etc/ge360-analitica/ge360.env
@@ -182,6 +182,6 @@ jobs:
         with:
           name: ge360-analitica-linux-amd64
           path: |
-            dist/ge360-analitica_0.6.0_amd64.deb
-            dist/ge360-analitica-linux-amd64-0.6.0.tar.gz
+            dist/ge360-analitica_0.6.1_amd64.deb
+            dist/ge360-analitica-linux-amd64-0.6.1.tar.gz
           retention-days: 30
