@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import LocalAIPage from './LocalAIPage'
+import MetaAnalyticsPage from './MetaAnalyticsPage'
 import SetupWizardPage from './SetupWizardPage'
 import {
   Activity,
@@ -50,6 +51,7 @@ const nav = [
   { id: 'setup', label: 'Configurazione', icon: Settings2 },
   { id: 'acquisition', label: 'Acquisizione', icon: TrendingUp },
   { id: 'content', label: 'Contenuti', icon: BarChart3 },
+  { id: 'meta', label: 'Meta Analytics', icon: Share2 },
   { id: 'leads', label: 'Lead', icon: Target },
   { id: 'seo', label: 'SEO locale', icon: Search },
   { id: 'connectors', label: 'Connettori', icon: Link2 },
@@ -287,6 +289,13 @@ function App() {
 
         {activeView === 'acquisition' && <AcquisitionPage data={data} />}
         {activeView === 'content' && <ContentPage data={data} items={contentPerformance} />}
+        {activeView === 'meta' && (
+          <MetaAnalyticsPage
+            days={days}
+            syncProvider={syncProvider}
+            syncing={syncing}
+          />
+        )}
         {activeView === 'leads' && <LeadsPage summary={leadsSummary} recent={recentLeads} />}
         {activeView === 'seo' && <SeoPage rows={seoRows} anomalies={anomalyRows} />}
         {activeView === 'connectors' && (
