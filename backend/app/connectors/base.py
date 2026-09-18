@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 
@@ -7,8 +7,10 @@ from typing import Any
 class ConnectorResult:
     provider: str
     ok: bool
-    metrics: list[dict[str, Any]]
-    events: list[dict[str, Any]]
+    metrics: list[dict[str, Any]] = field(default_factory=list)
+    events: list[dict[str, Any]] = field(default_factory=list)
+    content_items: list[dict[str, Any]] = field(default_factory=list)
+    cursor: str | None = None
     message: str = ""
 
 
@@ -20,5 +22,5 @@ class Connector(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def sync(self) -> ConnectorResult:
+    async def sync(self, cursor: str | None = None) -> ConnectorResult:
         raise NotImplementedError
