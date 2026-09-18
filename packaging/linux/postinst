@@ -24,4 +24,5 @@ echo
 echo "GE360 Analitica installato."
 echo "Dashboard: http://127.0.0.1:8788"
 echo "Configurazione: /etc/ge360-analitica/ge360.env"
+echo "AI locale: apri la dashboard > AI Locale per rilevare Ollama/Qwen già installati"
 echo "Stato: systemctl status ge360-analitica"
