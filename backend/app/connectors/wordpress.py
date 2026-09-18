@@ -1,6 +1,7 @@
 import html
 import os
 import re
+from datetime import datetime, timezone
 from typing import Any
 
 import httpx
@@ -9,6 +10,17 @@ from .base import Connector, ConnectorResult
 
 
 _TAG_RE = re.compile(r"<[^>]+>")
+
+
+def _wp_datetime(value: str | None) -> str | None:
+    if not value:
+        return None
+    try:
+        return datetime.strptime(value, "%Y-%m-%d %H:%M:%S").replace(
+            tzinfo=timezone.utc
+        ).isoformat()
+    except ValueError:
+        return value
 
 
 def _plain_title(value: Any) -> str:
@@ -105,7 +117,7 @@ class WordPressConnector(Connector):
                         "campaign": event.get("campaign") or None,
                         "content_id": event.get("content_id") or None,
                         "url": event.get("url") or None,
-                        "occurred_at": event.get("occurred_at"),
+                        "occurred_at": _wp_datetime(event.get("occurred_at")),
                     }
                 )
 
