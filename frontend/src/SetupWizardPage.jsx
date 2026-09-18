@@ -11,7 +11,6 @@ import {
   ExternalLink,
   Share2,
   Globe2,
-  Camera,
   Link2,
   RefreshCw,
   Search,
