@@ -1,0 +1,11 @@
+#!/bin/sh
+set -e
+
+PLUGIN_ROOT="/opt/ge360-analitica/chatgpt-plugin"
+
+if [ ! -f "$PLUGIN_ROOT/scripts/setup-chatgpt-plugin.sh" ]; then
+    echo "Plugin ChatGPT GE360 non trovato in $PLUGIN_ROOT" >&2
+    exit 1
+fi
+
+exec "$PLUGIN_ROOT/scripts/setup-chatgpt-plugin.sh"
