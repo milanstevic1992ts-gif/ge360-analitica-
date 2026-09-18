@@ -73,11 +73,25 @@ jobs:
           curl -fsS http://127.0.0.1:18788/ | grep -i "GE360 Analitica"
           curl -fsS http://127.0.0.1:18788/api/setup/status | grep '"completion"'
 
+          curl -fsS -X POST http://127.0.0.1:18788/api/setup/google/import-oauth-json \
+            -H 'Content-Type: application/json' \
+            -d '{"payload":{"web":{"client_id":"imported-client","client_secret":"imported-secret","redirect_uris":["http://127.0.0.1:8788/api/oauth/google/callback"]}}}' \
+            | grep '"redirect_ready":true'
+
+          curl -fsS http://127.0.0.1:18788/api/oauth/google/start | grep 'accounts.google.com'
+
+          curl -fsS -X POST http://127.0.0.1:18788/api/setup/meta/credentials \
+            -H 'Content-Type: application/json' \
+            -d '{"app_id":"meta-test-app","app_secret":"meta-test-secret","graph_version":"v26.0"}' \
+            | grep '"oauth_ready":true'
+
+          curl -fsS http://127.0.0.1:18788/api/oauth/meta/start | grep 'facebook.com'
+
           curl -fsS -X POST http://127.0.0.1:18788/api/setup/google             -H 'Content-Type: application/json'             -d '{"client_id":"wizard-test-client","client_secret":"wizard-test-secret","ga4_property_id":"123456789","search_console_site_url":"https://example.com/","business_location_name":"locations/123"}'             | grep '"oauth_ready":true'
 
           curl -fsS http://127.0.0.1:18788/api/setup/status >"$RUNNER_TEMP/setup-status.json"
           grep 'wizard-test-client' "$RUNNER_TEMP/setup-status.json"
-          if grep -q 'wizard-test-secret' "$RUNNER_TEMP/setup-status.json"; then
+          if grep -q 'wizard-test-secret\|imported-secret\|meta-test-secret' "$RUNNER_TEMP/setup-status.json"; then
             echo "Secret leaked by setup status"
             exit 1
           fi
@@ -114,17 +128,17 @@ jobs:
 
       - name: Build DEB and portable archive
         env:
-          GE360_VERSION: "0.4.0"
+          GE360_VERSION: "0.5.0"
           GE360_ARCH: amd64
         run: |
           chmod +x scripts/build-linux-package.sh
           scripts/build-linux-package.sh
-          dpkg-deb --info dist/ge360-analitica_0.4.0_amd64.deb
-          dpkg-deb --contents dist/ge360-analitica_0.4.0_amd64.deb | head -80
+          dpkg-deb --info dist/ge360-analitica_0.5.0_amd64.deb
+          dpkg-deb --contents dist/ge360-analitica_0.5.0_amd64.deb | head -80
 
       - name: Test DEB install and in-place upgrade persistence
         run: |
-          sudo dpkg -i dist/ge360-analitica_0.4.0_amd64.deb
+          sudo dpkg -i dist/ge360-analitica_0.5.0_amd64.deb
           /usr/bin/ge360-analitica version
           test -f /etc/ge360-analitica/ge360.env
           test -f /lib/systemd/system/ge360-analitica.service
@@ -140,7 +154,7 @@ jobs:
           sudo chmod 600 /var/lib/ge360-analitica/secrets/runtime_config.json
 
           # Reinstalla/aggiorna sopra l'installazione esistente.
-          sudo dpkg -i dist/ge360-analitica_0.4.0_amd64.deb
+          sudo dpkg -i dist/ge360-analitica_0.5.0_amd64.deb
 
           sudo grep "persistent-db-marker" /var/lib/ge360-analitica/upgrade-marker
           sudo grep "user-setting-must-survive" /etc/ge360-analitica/ge360.env
@@ -151,6 +165,6 @@ jobs:
         with:
           name: ge360-analitica-linux-amd64
           path: |
-            dist/ge360-analitica_0.4.0_amd64.deb
-            dist/ge360-analitica-linux-amd64-0.4.0.tar.gz
+            dist/ge360-analitica_0.5.0_amd64.deb
+            dist/ge360-analitica-linux-amd64-0.5.0.tar.gz
           retention-days: 30
