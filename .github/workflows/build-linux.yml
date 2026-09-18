@@ -7,14 +7,8 @@ on:
     paths:
       - "backend/**"
       - "frontend/**"
-      - "mcp_server/**"
-      - "skills/**"
       - "scripts/build-linux-package.sh"
-      - "scripts/run-mcp.sh"
-      - "scripts/setup-chatgpt-plugin.sh"
       - "packaging/linux/**"
-      - "plugin.json"
-      - "mcp.json"
       - ".github/workflows/build-linux.yml"
 
 jobs:
@@ -77,30 +71,58 @@ jobs:
           curl -fsS http://127.0.0.1:18788/api/health | grep '"status":"ok"'
           curl -fsS http://127.0.0.1:18788/ | grep -i "GE360 Analitica"
 
+      - name: Smoke test local Ollama intelligence
+        run: |
+          python scripts/mock_ollama.py >"$RUNNER_TEMP/mock-ollama.log" 2>&1 &
+          OLLAMA_PID=$!
+          trap 'kill $OLLAMA_PID 2>/dev/null || true' EXIT
+
+          export GE360_DB_PATH="$RUNNER_TEMP/ge360-ai.db"
+          export GE360_GOOGLE_TOKEN_FILE="$RUNNER_TEMP/google_oauth-ai.json"
+          export GE360_FRONTEND_DIR="$GITHUB_WORKSPACE/frontend/dist"
+          export GE360_AUTO_SYNC=false
+
+          ./dist/ge360-analitica serve --host 127.0.0.1 --port 18789 >"$RUNNER_TEMP/ge360-ai.log" 2>&1 &
+          APP_PID=$!
+          trap 'kill $APP_PID $OLLAMA_PID 2>/dev/null || true' EXIT
+
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:18789/api/local-ai/status >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+
+          curl -fsS http://127.0.0.1:18789/api/local-ai/status | grep '"ok":true'
+          curl -fsS -X POST http://127.0.0.1:18789/api/local-ai/configure             -H 'Content-Type: application/json'             -d '{"base_url":"http://127.0.0.1:11434","model":"qwen2.5:7b","think":false}'             | grep '"model":"qwen2.5:7b"'
+
+          curl -fsS -X POST http://127.0.0.1:18789/api/local-ai/report             -H 'Content-Type: application/json'             -d '{"days":30,"report_type":"full"}'             | tee "$RUNNER_TEMP/ai-report.json"             | grep '"report_markdown"'
+
+          grep 'Test GE360 Intelligence completato' "$RUNNER_TEMP/ai-report.json"
+
       - name: Build DEB and portable archive
         env:
-          GE360_VERSION: "0.2.1"
+          GE360_VERSION: "0.3.0"
           GE360_ARCH: amd64
         run: |
           chmod +x scripts/build-linux-package.sh
           scripts/build-linux-package.sh
-          dpkg-deb --info dist/ge360-analitica_0.2.1_amd64.deb
-          dpkg-deb --contents dist/ge360-analitica_0.2.1_amd64.deb | head -80
+          dpkg-deb --info dist/ge360-analitica_0.3.0_amd64.deb
+          dpkg-deb --contents dist/ge360-analitica_0.3.0_amd64.deb | head -80
 
       - name: Test DEB install
         run: |
-          sudo dpkg -i dist/ge360-analitica_0.2.1_amd64.deb
+          sudo dpkg -i dist/ge360-analitica_0.3.0_amd64.deb
           /usr/bin/ge360-analitica version
           test -f /etc/ge360-analitica/ge360.env
           test -f /lib/systemd/system/ge360-analitica.service
           test -f /opt/ge360-analitica/www/index.html
-          test -f /opt/ge360-analitica/chatgpt-plugin/plugin.json
 
       - name: Upload Linux packages
         uses: actions/upload-artifact@v4
         with:
           name: ge360-analitica-linux-amd64
           path: |
-            dist/ge360-analitica_0.2.1_amd64.deb
-            dist/ge360-analitica-linux-amd64-0.2.1.tar.gz
+            dist/ge360-analitica_0.3.0_amd64.deb
+            dist/ge360-analitica-linux-amd64-0.3.0.tar.gz
           retention-days: 30
