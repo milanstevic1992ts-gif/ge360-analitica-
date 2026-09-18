@@ -6,6 +6,7 @@ from .connectors.registry import diagnostics
 from .connectors.wordpress import WordPressConnector
 from .db import connector_states, initialize
 from .demo_data import dashboard
+from .sync import sync_all, sync_provider
 
 app = FastAPI(
     title="GE360 Analitica API",
@@ -61,6 +62,21 @@ async def test_wordpress_connector() -> dict:
         "metrics": result.metrics,
         "message": result.message,
     }
+
+
+@app.post("/api/sync")
+async def run_sync_all() -> dict:
+    return await sync_all()
+
+
+@app.post("/api/sync/{provider}")
+async def run_sync_provider(provider: str) -> dict:
+    try:
+        return await sync_provider(provider)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Sync {provider} fallita: {exc}") from exc
 
 
 @app.get("/api/analytics/status")
