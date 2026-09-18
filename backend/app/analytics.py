@@ -387,3 +387,108 @@ def local_seo(days: int = 30, contains: str = "trieste", limit: int = 50) -> lis
         ).fetchall()
 
     return [dict(row) for row in rows]
+
+
+def meta_dashboard(days: int = 30) -> dict[str, Any]:
+    days = _days(days, 365)
+    cutoff = _cutoff(days)
+
+    with connect() as conn:
+        metric_rows = conn.execute(
+            """
+            SELECT metric, value, dimension, dimension_value, captured_at
+            FROM metric_snapshots
+            WHERE provider = 'meta' AND captured_at >= ?
+            ORDER BY captured_at ASC
+            """,
+            (cutoff,),
+        ).fetchall()
+
+        content_rows = conn.execute(
+            """
+            SELECT external_id, content_type, title, url, published_at
+            FROM content_items
+            WHERE provider = 'meta'
+              AND published_at IS NOT NULL
+              AND published_at >= ?
+            ORDER BY published_at DESC
+            LIMIT 100
+            """,
+            (cutoff,),
+        ).fetchall()
+
+    rows = [dict(row) for row in metric_rows]
+    contents = [dict(row) for row in content_rows]
+
+    latest_by_metric: dict[str, dict[str, Any]] = {}
+    series_by_metric: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    totals_by_metric: dict[str, float] = defaultdict(float)
+    media_metrics: dict[str, dict[str, float]] = defaultdict(lambda: defaultdict(float))
+
+    for row in rows:
+        metric = row["metric"]
+        value = float(row["value"] or 0)
+        latest_by_metric[metric] = row
+        series_by_metric[metric].append(
+            {"captured_at": row["captured_at"], "value": value}
+        )
+        totals_by_metric[metric] += value
+        if row.get("dimension") == "media_id" and row.get("dimension_value"):
+            media_metrics[str(row["dimension_value"])][metric] += value
+
+    content_performance = []
+    for item in contents:
+        external_id = str(item.get("external_id") or "")
+        media_id = external_id.removeprefix("ig:")
+        metrics_for_item = dict(media_metrics.get(media_id, {}))
+        if not metrics_for_item:
+            continue
+        engagement = sum(
+            metrics_for_item.get(name, 0)
+            for name in (
+                "instagram_media_total_interactions",
+                "instagram_media_like_count",
+                "instagram_media_likes",
+                "instagram_media_comments_count",
+                "instagram_media_comments",
+                "instagram_media_shares",
+                "instagram_media_saved",
+            )
+        )
+        reach = (
+            metrics_for_item.get("instagram_media_reach", 0)
+            or metrics_for_item.get("instagram_media_views", 0)
+            or metrics_for_item.get("instagram_media_impressions", 0)
+        )
+        content_performance.append(
+            {
+                **item,
+                "media_id": media_id,
+                "reach_or_views": round(reach, 2),
+                "engagement": round(engagement, 2),
+                "metrics": metrics_for_item,
+            }
+        )
+
+    content_performance.sort(
+        key=lambda item: (item["engagement"], item["reach_or_views"]),
+        reverse=True,
+    )
+
+    return {
+        "days": days,
+        "metric_count": len(rows),
+        "available_metrics": sorted(latest_by_metric.keys()),
+        "latest": {
+            key: {
+                "value": float(value["value"] or 0),
+                "captured_at": value["captured_at"],
+                "dimension": value.get("dimension"),
+                "dimension_value": value.get("dimension_value"),
+            }
+            for key, value in latest_by_metric.items()
+        },
+        "totals": {key: round(value, 2) for key, value in totals_by_metric.items()},
+        "series": dict(series_by_metric),
+        "content_performance": content_performance[:30],
+    }
