@@ -50,7 +50,7 @@ Priority: optional
 Architecture: $ARCH
 Maintainer: GE360
 Depends: adduser
-Recommends: xdg-utils
+Recommends: xdg-utils, python3-venv
 Description: GE360 Analitica self-hosted marketing dashboard
  Dashboard locale per WordPress, Google, Meta e ChatGPT MCP.
  Include backend standalone, frontend web, sync automatico e plugin ChatGPT.
