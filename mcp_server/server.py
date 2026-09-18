@@ -1,236 +1,201 @@
+import json
 import os
-import sqlite3
-from datetime import datetime, timedelta, timezone
-from pathlib import Path
 from typing import Any
+from urllib.parse import urlencode
+from urllib.request import Request, urlopen
 
-from mcp.server.mcpserver import MCPServer
+from mcp.server import MCPServer
+from mcp.types import ToolAnnotations
 
 
-ROOT = Path(__file__).resolve().parents[1]
-DB_PATH = Path(os.getenv("GE360_MCP_DB_PATH", ROOT / "data" / "ge360.db")).resolve()
+API_BASE = os.getenv("GE360_API_BASE", "http://127.0.0.1:8787").rstrip("/")
+READ_ONLY = ToolAnnotations(
+    read_only_hint=True,
+    idempotent_hint=True,
+    open_world_hint=False,
+)
 
 mcp = MCPServer(
     "GE360 Analitica",
     instructions=(
-        "GE360 Analitica espone esclusivamente dati analytics locali in sola lettura. "
-        "Usa questi strumenti per rispondere a domande su traffico, sorgenti, eventi, lead "
-        "e stato dei connettori. Non inventare dati mancanti e segnala quando lo storico "
-        "non è ancora sufficiente."
+        "GE360 Analitica espone dati analytics dell'attività in sola lettura. "
+        "Usa gli strumenti per basare le risposte su dati reali GE360. "
+        "Non inventare metriche o cause. Distingui sempre fatti, confronti e interpretazioni. "
+        "Se il database è vuoto o incompleto, dichiaralo chiaramente."
     ),
 )
 
 
-def _connect_readonly() -> sqlite3.Connection:
-    if not DB_PATH.exists():
+def _get(path: str, params: dict[str, Any] | None = None) -> Any:
+    url = f"{API_BASE}{path}"
+    if params:
+        clean = {key: value for key, value in params.items() if value is not None}
+        if clean:
+            url = f"{url}?{urlencode(clean)}"
+
+    request = Request(
+        url,
+        headers={
+            "Accept": "application/json",
+            "User-Agent": "GE360-ChatGPT-MCP/0.2",
+        },
+        method="GET",
+    )
+
+    try:
+        with urlopen(request, timeout=20) as response:
+            payload = response.read().decode("utf-8")
+    except Exception as exc:
         raise RuntimeError(
-            f"Database GE360 non trovato: {DB_PATH}. Avvia prima GE360 Analitica."
-        )
+            "GE360 API non raggiungibile. Verifica che docker compose sia attivo "
+            f"e che {API_BASE} risponda. Dettaglio: {exc}"
+        ) from exc
 
-    conn = sqlite3.connect(f"file:{DB_PATH}?mode=ro", uri=True)
-    conn.row_factory = sqlite3.Row
-    return conn
-
-
-def _cutoff(days: int) -> str:
-    days = max(1, min(days, 3650))
-    return (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    return json.loads(payload)
 
 
-@mcp.tool()
+@mcp.tool(
+    title="Stato GE360",
+    annotations=READ_ONLY,
+)
 def ge360_status() -> dict[str, Any]:
-    """Mostra stato del database e dei connettori GE360 senza esporre credenziali."""
-    with _connect_readonly() as conn:
-        connectors = conn.execute(
-            """
-            SELECT provider, status, last_sync, message
-            FROM connector_state
-            ORDER BY provider
-            """
-        ).fetchall()
-
-        counts = {}
-        for table in ("metric_snapshots", "events", "leads"):
-            counts[table] = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
-
-    return {
-        "database": str(DB_PATH),
-        "read_only": True,
-        "records": counts,
-        "connectors": [dict(row) for row in connectors],
-    }
+    """Controlla quantità di dati, ultimo aggiornamento e stato dei connettori GE360."""
+    return _get("/api/analytics/status")
 
 
-@mcp.tool()
+@mcp.tool(
+    title="Metriche GE360",
+    annotations=READ_ONLY,
+)
 def ge360_metrics(
     days: int = 30,
     provider: str | None = None,
     metric: str | None = None,
     limit: int = 200,
 ) -> list[dict[str, Any]]:
-    """Legge le metriche normalizzate GE360 per periodo, provider o nome metrica."""
-    limit = max(1, min(limit, 500))
-    clauses = ["captured_at >= ?"]
-    params: list[Any] = [_cutoff(days)]
-
-    if provider:
-        clauses.append("provider = ?")
-        params.append(provider)
-    if metric:
-        clauses.append("metric = ?")
-        params.append(metric)
-
-    params.append(limit)
-    query = f"""
-        SELECT provider, metric, value, dimension, dimension_value, captured_at
-        FROM metric_snapshots
-        WHERE {' AND '.join(clauses)}
-        ORDER BY captured_at DESC
-        LIMIT ?
-    """
-
-    with _connect_readonly() as conn:
-        rows = conn.execute(query, params).fetchall()
-
-    return [dict(row) for row in rows]
+    """Legge metriche normalizzate per periodo, piattaforma o nome metrica."""
+    return _get(
+        "/api/analytics/metrics",
+        {
+            "days": days,
+            "provider": provider,
+            "metric": metric,
+            "limit": limit,
+        },
+    )
 
 
-@mcp.tool()
+@mcp.tool(
+    title="Riepilogo eventi",
+    annotations=READ_ONLY,
+)
 def ge360_events_summary(days: int = 30) -> list[dict[str, Any]]:
-    """Riassume gli eventi GE360 per tipo e sorgente senza restituire payload grezzi."""
-    with _connect_readonly() as conn:
-        rows = conn.execute(
-            """
-            SELECT
-                event_type,
-                COALESCE(source, 'non_attribuita') AS source,
-                COUNT(*) AS events
-            FROM events
-            WHERE occurred_at >= ?
-            GROUP BY event_type, COALESCE(source, 'non_attribuita')
-            ORDER BY events DESC
-            """,
-            (_cutoff(days),),
-        ).fetchall()
-
-    return [dict(row) for row in rows]
+    """Riassume visite e azioni tracciate, raggruppate per tipo e sorgente."""
+    return _get("/api/analytics/events-summary", {"days": days})
 
 
-@mcp.tool()
+@mcp.tool(
+    title="Riepilogo lead",
+    annotations=READ_ONLY,
+)
 def ge360_leads_summary(days: int = 30) -> dict[str, Any]:
-    """Riassume lead, canali, sorgenti e valore senza esporre dati personali o payload."""
-    cutoff = _cutoff(days)
-
-    with _connect_readonly() as conn:
-        total_row = conn.execute(
-            """
-            SELECT
-                COUNT(*) AS leads,
-                COALESCE(SUM(value), 0) AS total_value
-            FROM leads
-            WHERE created_at >= ?
-            """,
-            (cutoff,),
-        ).fetchone()
-
-        by_channel = conn.execute(
-            """
-            SELECT channel, COUNT(*) AS leads, COALESCE(SUM(value), 0) AS total_value
-            FROM leads
-            WHERE created_at >= ?
-            GROUP BY channel
-            ORDER BY leads DESC
-            """,
-            (cutoff,),
-        ).fetchall()
-
-        by_source = conn.execute(
-            """
-            SELECT COALESCE(source, 'non_attribuita') AS source, COUNT(*) AS leads
-            FROM leads
-            WHERE created_at >= ?
-            GROUP BY COALESCE(source, 'non_attribuita')
-            ORDER BY leads DESC
-            LIMIT 20
-            """,
-            (cutoff,),
-        ).fetchall()
-
-    return {
-        "days": max(1, min(days, 3650)),
-        "total": dict(total_row),
-        "by_channel": [dict(row) for row in by_channel],
-        "by_source": [dict(row) for row in by_source],
-    }
+    """Riassume lead per canale e sorgente senza esporre payload o dati personali."""
+    return _get("/api/analytics/leads-summary", {"days": days})
 
 
-@mcp.tool()
+@mcp.tool(
+    title="Lead recenti",
+    annotations=READ_ONLY,
+)
 def ge360_recent_leads(days: int = 30, limit: int = 50) -> list[dict[str, Any]]:
-    """Elenca solo i campi analitici dei lead recenti; non restituisce payload o dati personali."""
-    limit = max(1, min(limit, 100))
-
-    with _connect_readonly() as conn:
-        rows = conn.execute(
-            """
-            SELECT channel, source, landing_page, campaign, status, value, created_at
-            FROM leads
-            WHERE created_at >= ?
-            ORDER BY created_at DESC
-            LIMIT ?
-            """,
-            (_cutoff(days), limit),
-        ).fetchall()
-
-    return [dict(row) for row in rows]
+    """Restituisce soltanto campi analitici dei lead recenti, senza payload personali."""
+    return _get(
+        "/api/analytics/recent-leads",
+        {"days": days, "limit": limit},
+    )
 
 
-@mcp.tool()
-def ge360_compare_periods(metric: str, provider: str | None = None, days: int = 7) -> dict[str, Any]:
-    """Confronta la somma di una metrica tra il periodo recente e quello precedente."""
-    days = max(1, min(days, 365))
-    now = datetime.now(timezone.utc)
-    current_start = now - timedelta(days=days)
-    previous_start = current_start - timedelta(days=days)
+@mcp.tool(
+    title="Confronta una metrica",
+    annotations=READ_ONLY,
+)
+def ge360_compare_periods(
+    metric: str,
+    provider: str | None = None,
+    days: int = 7,
+) -> dict[str, Any]:
+    """Confronta una metrica nel periodo recente con il periodo precedente equivalente."""
+    return _get(
+        "/api/analytics/compare",
+        {"metric": metric, "provider": provider, "days": days},
+    )
 
-    clauses = ["metric = ?"]
-    base_params: list[Any] = [metric]
-    if provider:
-        clauses.append("provider = ?")
-        base_params.append(provider)
 
-    where = " AND ".join(clauses)
+@mcp.tool(
+    title="Opportunity Radar",
+    annotations=READ_ONLY,
+)
+def ge360_opportunity_radar(
+    days: int = 30,
+    min_views: int = 20,
+    limit: int = 20,
+) -> list[dict[str, Any]]:
+    """Trova pagine con traffico significativo ma conversione lead debole."""
+    return _get(
+        "/api/analytics/opportunities",
+        {"days": days, "min_views": min_views, "limit": limit},
+    )
 
-    with _connect_readonly() as conn:
-        current = conn.execute(
-            f"""
-            SELECT COALESCE(SUM(value), 0)
-            FROM metric_snapshots
-            WHERE {where} AND captured_at >= ? AND captured_at < ?
-            """,
-            [*base_params, current_start.isoformat(), now.isoformat()],
-        ).fetchone()[0]
 
-        previous = conn.execute(
-            f"""
-            SELECT COALESCE(SUM(value), 0)
-            FROM metric_snapshots
-            WHERE {where} AND captured_at >= ? AND captured_at < ?
-            """,
-            [*base_params, previous_start.isoformat(), current_start.isoformat()],
-        ).fetchone()[0]
+@mcp.tool(
+    title="Prestazioni contenuti",
+    annotations=READ_ONLY,
+)
+def ge360_content_performance(
+    days: int = 30,
+    limit: int = 25,
+) -> list[dict[str, Any]]:
+    """Unisce visite, click WhatsApp, chiamate, moduli e lead per pagina."""
+    return _get(
+        "/api/analytics/content-performance",
+        {"days": days, "limit": limit},
+    )
 
-    change_percent = None
-    if previous:
-        change_percent = round(((current - previous) / previous) * 100, 2)
 
-    return {
-        "metric": metric,
-        "provider": provider,
-        "days": days,
-        "current": current,
-        "previous": previous,
-        "change_percent": change_percent,
-    }
+@mcp.tool(
+    title="Anomaly Watch",
+    annotations=READ_ONLY,
+)
+def ge360_anomalies(
+    days: int = 7,
+    threshold_percent: float = 30.0,
+    limit: int = 30,
+) -> list[dict[str, Any]]:
+    """Segnala variazioni anomale tra il periodo recente e quello precedente."""
+    return _get(
+        "/api/analytics/anomalies",
+        {
+            "days": days,
+            "threshold_percent": threshold_percent,
+            "limit": limit,
+        },
+    )
+
+
+@mcp.tool(
+    title="SEO locale",
+    annotations=READ_ONLY,
+)
+def ge360_local_seo(
+    days: int = 30,
+    contains: str = "trieste",
+    limit: int = 50,
+) -> list[dict[str, Any]]:
+    """Legge query Search Console locali che contengono una parola o località."""
+    return _get(
+        "/api/analytics/local-seo",
+        {"days": days, "contains": contains, "limit": limit},
+    )
 
 
 if __name__ == "__main__":
