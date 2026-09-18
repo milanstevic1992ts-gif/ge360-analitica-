@@ -6,6 +6,7 @@ import httpx
 
 from .base import Connector, ConnectorResult
 from .google_auth import GoogleAuth
+from ..config_store import get as config_get
 
 
 DAILY_METRICS = [
@@ -35,7 +36,7 @@ class GoogleBusinessConnector(Connector):
     provider = "google_business"
 
     def __init__(self) -> None:
-        self.location = os.getenv("GOOGLE_BUSINESS_LOCATION_NAME", "").strip()
+        self.location = config_get("GOOGLE_BUSINESS_LOCATION_NAME").strip()
         self.auth = GoogleAuth()
 
     def configured(self) -> bool:
