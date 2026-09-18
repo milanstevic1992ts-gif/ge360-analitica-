@@ -4,7 +4,21 @@
 
   const cleanSource = () => {
     const params = new URLSearchParams(window.location.search);
-    return params.get('utm_source') || '';
+    const utm = params.get('utm_source');
+    if (utm) return utm.toLowerCase();
+
+    if (!document.referrer) return 'direct';
+
+    try {
+      const host = new URL(document.referrer).hostname.toLowerCase();
+      if (host.includes('google.')) return 'google';
+      if (host.includes('facebook.') || host.includes('fb.com')) return 'facebook';
+      if (host.includes('instagram.')) return 'instagram';
+      if (host === window.location.hostname.toLowerCase()) return 'internal';
+      return host.replace(/^www\./, '');
+    } catch {
+      return 'referral';
+    }
   };
 
   const cleanCampaign = () => {
