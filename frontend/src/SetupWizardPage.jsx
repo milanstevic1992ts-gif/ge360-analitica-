@@ -103,6 +103,8 @@ function SetupWizardPage({ onFinish }) {
   const [message, setMessage] = useState('')
   const [googleResources, setGoogleResources] = useState(null)
   const [metaPages, setMetaPages] = useState([])
+  const [facebookSdkReady, setFacebookSdkReady] = useState(Boolean(window.FB))
+  const [facebookSdkError, setFacebookSdkError] = useState('')
 
   const [aiBaseUrl, setAiBaseUrl] = useState('http://127.0.0.1:11434')
   const [aiModel, setAiModel] = useState('')
@@ -131,6 +133,25 @@ function SetupWizardPage({ onFinish }) {
 
   const current = steps[step]
   const CurrentIcon = current.icon
+
+  const prepareFacebookSdk = async (appId, version = 'v26.0') => {
+    if (!appId) {
+      setFacebookSdkReady(false)
+      return false
+    }
+
+    try {
+      const FB = await loadFacebookSdkLibrary()
+      initFacebookSdk(FB, appId, version)
+      setFacebookSdkReady(true)
+      setFacebookSdkError('')
+      return true
+    } catch (error) {
+      setFacebookSdkReady(false)
+      setFacebookSdkError(error.message || 'Facebook SDK non disponibile')
+      return false
+    }
+  }
 
   const loadStatus = async () => {
     setBusy('status')
@@ -168,11 +189,17 @@ function SetupWizardPage({ onFinish }) {
         business_location_name: payload.google?.GOOGLE_BUSINESS_LOCATION_NAME?.value || '',
       }))
 
+      const metaAppId = payload.meta?.META_APP_ID?.value || ''
+      const metaVersion = payload.meta?.META_GRAPH_VERSION?.value || 'v26.0'
       setMeta((prev) => ({
         ...prev,
-        app_id: payload.meta?.META_APP_ID?.value || '',
-        graph_version: payload.meta?.META_GRAPH_VERSION?.value || 'v26.0',
+        app_id: metaAppId,
+        graph_version: metaVersion,
       }))
+
+      if (metaAppId) {
+        prepareFacebookSdk(metaAppId, metaVersion)
+      }
     } finally {
       setBusy('')
     }
@@ -229,7 +256,9 @@ function SetupWizardPage({ onFinish }) {
   }
 
   useEffect(() => {
-    loadFacebookSdkLibrary().catch(() => {})
+    loadFacebookSdkLibrary()
+      .then(() => setFacebookSdkReady(Boolean(window.FB)))
+      .catch((error) => setFacebookSdkError(error.message || 'Facebook SDK non disponibile'))
 
     const initialize = async () => {
       await loadStatus()
@@ -422,10 +451,18 @@ function SetupWizardPage({ onFinish }) {
       if (!response.ok) throw new Error(payload.detail || 'Configurazione Meta non salvata')
       setMessage(
         payload.sdk_ready
-          ? 'Meta App ID salvato. Ora premi Accedi con Facebook.'
+          ? 'Meta App ID salvato. Preparo Facebook Login…'
           : 'Inserisci il Meta App ID.'
       )
       await loadStatus()
+      if (payload.sdk_ready) {
+        const ready = await prepareFacebookSdk(meta.app_id, meta.graph_version || 'v26.0')
+        setMessage(
+          ready
+            ? 'Facebook Login pronto. Ora premi Accedi con Facebook.'
+            : 'App ID salvato, ma il modulo Facebook non si è caricato. Ricarica la pagina.'
+        )
+      }
     } catch (error) {
       setMessage(error.message)
     } finally {
@@ -433,7 +470,7 @@ function SetupWizardPage({ onFinish }) {
     }
   }
 
-  const connectMeta = async () => {
+  const connectMeta = () => {
     setMessage('')
 
     const appId = status?.meta?.META_APP_ID?.value || meta.app_id
@@ -447,13 +484,32 @@ function SetupWizardPage({ onFinish }) {
       return
     }
 
-    setBusy('meta-login')
-    try {
-      const FB = await loadFacebookSdkLibrary()
-      initFacebookSdk(FB, appId, meta.graph_version || 'v26.0')
+    // FB.login deve partire direttamente dal click dell'utente. Se aspettiamo una
+    // Promise prima di aprire il popup, alcuni browser lo bloccano silenziosamente.
+    if (!facebookSdkReady || !window.FB || window.__GE360_FB_APP_ID !== appId) {
+      setMessage('Facebook Login si sta preparando. Attendi un secondo e riprova.')
+      prepareFacebookSdk(appId, meta.graph_version || 'v26.0')
+      return
+    }
 
-      FB.login(
+    setBusy('meta-login')
+    setMessage('Apro Facebook… se non compare una finestra, controlla il blocco popup del browser.')
+
+    let callbackReceived = false
+    const popupTimer = window.setTimeout(() => {
+      if (!callbackReceived) {
+        setBusy('')
+        setMessage(
+          'Facebook non ha aperto la finestra di accesso. Consenti i popup per questo sito e riprova.'
+        )
+      }
+    }, 12000)
+
+    try {
+      window.FB.login(
         async (response) => {
+          callbackReceived = true
+          window.clearTimeout(popupTimer)
           try {
             const auth = response?.authResponse
             if (!auth?.accessToken) {
@@ -461,6 +517,7 @@ function SetupWizardPage({ onFinish }) {
               return
             }
 
+            setMessage('Facebook autorizzato. Sto leggendo le Pagine disponibili…')
             const sessionResponse = await fetch('/api/oauth/meta/session', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -495,7 +552,9 @@ function SetupWizardPage({ onFinish }) {
         }
       )
     } catch (error) {
-      setMessage(error.message)
+      callbackReceived = true
+      window.clearTimeout(popupTimer)
+      setMessage(error.message || 'Impossibile aprire Facebook Login')
       setBusy('')
     }
   }
@@ -797,11 +856,30 @@ function SetupWizardPage({ onFinish }) {
                 <button
                   className="primary-action login-action facebook-login-action"
                   onClick={connectMeta}
-                  disabled={Boolean(busy) || !status?.meta?.META_APP_ID?.configured}
+                  disabled={Boolean(busy) || !status?.meta?.META_APP_ID?.configured || !facebookSdkReady}
                 >
-                  <LogIn size={15} /> {status?.meta?.META_USER_ACCESS_TOKEN?.configured ? 'Ricollega Facebook' : 'Accedi con Facebook'}
+                  <LogIn size={15} /> {
+                    !facebookSdkReady
+                      ? 'Preparo Facebook…'
+                      : status?.meta?.META_USER_ACCESS_TOKEN?.configured
+                        ? 'Ricollega Facebook'
+                        : 'Accedi con Facebook'
+                  }
                 </button>
               </div>
+
+              {facebookSdkError && (
+                <div className="wizard-help-card">
+                  <div><CircleAlert size={15} /><strong>Facebook Login non è pronto</strong></div>
+                  <p>{facebookSdkError}</p>
+                  <button
+                    className="secondary-action"
+                    onClick={() => prepareFacebookSdk(meta.app_id, meta.graph_version || 'v26.0')}
+                  >
+                    <RefreshCw size={14} /> Riprova caricamento Facebook
+                  </button>
+                </div>
+              )}
 
               {!status?.meta?.META_APP_ID?.configured ? (
                 <div className="one-time-setup">
