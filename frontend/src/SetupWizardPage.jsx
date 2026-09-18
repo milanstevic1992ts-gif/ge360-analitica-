@@ -1027,7 +1027,11 @@ function SetupWizardPage({ onFinish }) {
                     <span className="eyebrow">PAGINE DISPONIBILI</span>
                     <h4>Scegli Pagina Facebook e profilo Instagram</h4>
                     <p>Se la Pagina ha un account Instagram Business/Creator collegato, GE360 lo associa automaticamente.</p>
-                    <strong>{filteredMetaPages.length} Pagine trovate</strong>
+                    <strong>
+                      {metaPageQuery.trim()
+                        ? `${filteredMetaPages.length} risultati su ${metaPages.length} Pagine`
+                        : `${metaPages.length} Pagine trovate`}
+                    </strong>
                   </div>
 
                   <Field label="Cerca Pagina Facebook...">
@@ -1058,14 +1062,27 @@ function SetupWizardPage({ onFinish }) {
                     </div>
                   </Field>
 
+                  <div className="wizard-help-card" style={{ marginTop: -4, marginBottom: 10 }}>
+                    <div><ArrowRight size={15} /><strong>La Pagina può essere molto più in basso</strong></div>
+                    <p>Scorri direttamente dentro l'elenco qui sotto con la rotellina del mouse o cerca una parte del nome: non serve scorrere tutta la schermata.</p>
+                  </div>
+
                   {filteredMetaPages.length > 0 ? (
                     <div
                       className="page-choice-grid"
+                      tabIndex={0}
+                      aria-label="Elenco Pagine Facebook. Usa la rotellina del mouse o scorri con il dito."
                       style={{
-                        maxHeight: 550,
-                        overflowY: 'auto',
+                        height: 'min(68vh, 760px)',
+                        minHeight: 420,
+                        overflowY: 'scroll',
+                        overflowX: 'hidden',
                         overscrollBehavior: 'contain',
-                        paddingRight: 4,
+                        WebkitOverflowScrolling: 'touch',
+                        touchAction: 'pan-y',
+                        scrollbarGutter: 'stable',
+                        paddingRight: 8,
+                        borderRadius: 14,
                       }}
                     >
                       {filteredMetaPages.map((page) => {
