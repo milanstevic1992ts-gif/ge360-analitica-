@@ -1,0 +1,21 @@
+{
+  "name": "ge360-local",
+  "interface": {
+    "displayName": "GE360 Local"
+  },
+  "plugins": [
+    {
+      "name": "ge360-analitica",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/milanstevic1992ts-gif/ge360-analitica-.git",
+        "ref": "main"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}
