@@ -50,6 +50,18 @@ jobs:
       - name: Import MCP server
         run: python -c "from mcp_server.server import mcp; print('GE360 MCP ready')"
 
+  wordpress:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate PHP
+        run: php -l wordpress-plugin/ge360-tracker/ge360-tracker.php
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Validate tracker JavaScript
+        run: node --check wordpress-plugin/ge360-tracker/tracker.js
+
   frontend:
     runs-on: ubuntu-latest
     steps:
