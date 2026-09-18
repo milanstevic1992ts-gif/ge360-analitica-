@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=GE360 Analitica
+Comment=Dashboard analytics GE360
+Exec=ge360-open
+Terminal=false
+Categories=Office;Utility;
+StartupNotify=true
