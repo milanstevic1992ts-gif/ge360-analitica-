@@ -46,6 +46,10 @@ class MetaSetupRequest(BaseModel):
     graph_version: str = Field(default="v26.0", max_length=20)
 
 
+class PublicOriginRequest(BaseModel):
+    origin: str = Field(min_length=8, max_length=500)
+
+
 def _completion() -> dict[str, bool]:
     return {
         "ai": False,
@@ -79,6 +83,12 @@ async def status() -> dict[str, Any]:
         "total": total,
         "percent": round(done / total * 100) if total else 0,
         "ai": ai_status,
+        "system": snapshot(
+            [
+                "GE360_PUBLIC_ORIGIN",
+                "META_REDIRECT_URI",
+            ]
+        ),
         "wordpress": snapshot(
             [
                 "WORDPRESS_BASE_URL",
@@ -105,6 +115,12 @@ async def status() -> dict[str, Any]:
                 "META_INSTAGRAM_ACCOUNT_ID",
                 "META_GRAPH_VERSION",
                 "META_USER_ACCESS_TOKEN",
+                "META_USER_ID",
+                "META_USER_NAME",
+                "META_TOKEN_EXPIRES_AT",
+                "META_DATA_ACCESS_EXPIRES_AT",
+                "META_PAGE_NAME",
+                "META_INSTAGRAM_USERNAME",
             ]
         ),
     }
@@ -301,15 +317,47 @@ def save_meta_credentials(request: MetaCredentialsRequest) -> dict[str, Any]:
     values = {
         "META_APP_ID": request.app_id or get("META_APP_ID"),
         "META_GRAPH_VERSION": request.graph_version or "v26.0",
-        "META_REDIRECT_URI": "http://127.0.0.1:8788/api/oauth/meta/callback",
     }
     if request.app_secret:
         values["META_APP_SECRET"] = request.app_secret
     set_many(values)
     return {
         "ok": True,
+        "sdk_ready": bool(get("META_APP_ID")),
         "oauth_ready": bool(get("META_APP_ID") and get("META_APP_SECRET")),
-        "redirect_uri": "http://127.0.0.1:8788/api/oauth/meta/callback",
+        "redirect_uri": get(
+            "META_REDIRECT_URI",
+            "http://127.0.0.1:8788/api/oauth/meta/callback",
+        ),
+        "message": (
+            "Meta App ID salvato. Ora puoi usare Accedi con Facebook."
+            if get("META_APP_ID")
+            else "Inserisci il Meta App ID."
+        ),
+    }
+
+
+def save_public_origin(request: PublicOriginRequest) -> dict[str, Any]:
+    origin = request.origin.strip().rstrip("/")
+    if not (
+        origin.startswith("https://")
+        or origin.startswith("http://127.0.0.1")
+        or origin.startswith("http://localhost")
+    ):
+        raise ValueError("Usa un indirizzo HTTPS oppure localhost/127.0.0.1")
+
+    values = {"GE360_PUBLIC_ORIGIN": origin}
+    # Meta richiede HTTPS nei normali ambienti web. Conserviamo il callback
+    # coerente con Tailscale anche se il login principale usa il JS SDK.
+    if origin.startswith("https://"):
+        values["META_REDIRECT_URI"] = f"{origin}/api/oauth/meta/callback"
+
+    set_many(values)
+    return {
+        "ok": True,
+        "origin": origin,
+        "is_https": origin.startswith("https://"),
+        "meta_redirect_uri": get("META_REDIRECT_URI"),
     }
 
 
