@@ -6,11 +6,12 @@ import {
   Check,
   CheckCircle2,
   CircleAlert,
+  Camera,
   Cpu,
   ExternalLink,
-  Facebook,
+  Share2,
   Globe2,
-  Instagram,
+  Camera,
   Link2,
   RefreshCw,
   Search,
@@ -24,7 +25,7 @@ const steps = [
   { id: 'ai', label: 'AI locale', icon: Cpu },
   { id: 'wordpress', label: 'WordPress', icon: Globe2 },
   { id: 'google', label: 'Google', icon: Search },
-  { id: 'meta', label: 'Facebook + Instagram', icon: Facebook },
+  { id: 'meta', label: 'Facebook + Instagram', icon: Share2 },
   { id: 'finish', label: 'Verifica finale', icon: CheckCircle2 },
 ]
 
@@ -66,6 +67,7 @@ function SetupWizardPage({ onFinish }) {
   })
 
   const current = steps[step]
+  const CurrentIcon = current.icon
 
   const loadStatus = async () => {
     setBusy('status')
@@ -319,7 +321,7 @@ function SetupWizardPage({ onFinish }) {
 
         <main className="wizard-content">
           <div className="wizard-title">
-            <div className="wizard-title-icon"><current.icon size={22} /></div>
+            <div className="wizard-title-icon"><CurrentIcon size={22} /></div>
             <div><span>PASSAGGIO {step + 1} DI {steps.length}</span><h3>{current.label}</h3></div>
           </div>
 
@@ -488,8 +490,8 @@ function SetupWizardPage({ onFinish }) {
                 text="GE360 usa la Meta Graph API. Con Facebook Login, Instagram deve essere un account professionale collegato alla Pagina Facebook."
               />
               <div className="social-guide-grid">
-                <div><Facebook size={18} /><strong>Facebook</strong><span>Pagina professionale + Page Access Token</span></div>
-                <div><Instagram size={18} /><strong>Instagram</strong><span>Business/Creator collegato alla Pagina</span></div>
+                <div><Share2 size={18} /><strong>Facebook</strong><span>Pagina professionale + Page Access Token</span></div>
+                <div><Camera size={18} /><strong>Instagram</strong><span>Business/Creator collegato alla Pagina</span></div>
               </div>
               <a className="wizard-external-link" href="https://developers.facebook.com/apps/" target="_blank" rel="noreferrer">
                 Apri Meta for Developers <ExternalLink size={13} />
