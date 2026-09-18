@@ -714,3 +714,22 @@ button { cursor: pointer; }
   .wizard-actions,.wizard-footer { flex-direction:column; }
   .wizard-actions button,.wizard-footer button { width:100%;justify-content:center; }
 }
+
+.wizard-numbered {
+  margin:0 0 15px;padding:0;list-style:none;counter-reset:wizard-step;
+  display:grid;gap:8px;
+}
+.wizard-numbered li {
+  counter-increment:wizard-step;position:relative;padding:9px 10px 9px 38px;
+  border:1px solid rgba(148,163,184,.07);border-radius:10px;background:rgba(255,255,255,.012);
+}
+.wizard-numbered li::before {
+  content:counter(wizard-step);position:absolute;left:10px;top:9px;
+  width:19px;height:19px;border-radius:6px;display:grid;place-items:center;
+  background:rgba(101,127,255,.10);color:#91a2ff;font-size:8px;font-weight:800;
+}
+.wizard-numbered strong { display:block;font-size:9px;color:#dfe7f6; }
+.wizard-numbered span { display:block;margin-top:3px;color:#64728a;font-size:8px;line-height:1.45; }
+.wizard-numbered.compact { margin:9px 0;gap:5px; }
+.wizard-numbered.compact li { padding-top:7px;padding-bottom:7px; }
+.wizard-numbered.compact li::before { top:7px; }
