@@ -31,6 +31,12 @@ class GoogleSetupRequest(BaseModel):
     business_location_name: str = Field(default="", max_length=300)
 
 
+class MetaCredentialsRequest(BaseModel):
+    app_id: str = Field(default="", max_length=200)
+    app_secret: str = Field(default="", max_length=500)
+    graph_version: str = Field(default="v26.0", max_length=20)
+
+
 class MetaSetupRequest(BaseModel):
     app_id: str = Field(default="", max_length=200)
     app_secret: str = Field(default="", max_length=500)
@@ -289,6 +295,22 @@ async def discover_google_resources() -> dict[str, Any]:
             result["errors"]["business_accounts"] = str(exc)
 
     return result
+
+
+def save_meta_credentials(request: MetaCredentialsRequest) -> dict[str, Any]:
+    values = {
+        "META_APP_ID": request.app_id or get("META_APP_ID"),
+        "META_GRAPH_VERSION": request.graph_version or "v26.0",
+        "META_REDIRECT_URI": "http://127.0.0.1:8788/api/oauth/meta/callback",
+    }
+    if request.app_secret:
+        values["META_APP_SECRET"] = request.app_secret
+    set_many(values)
+    return {
+        "ok": True,
+        "oauth_ready": bool(get("META_APP_ID") and get("META_APP_SECRET")),
+        "redirect_uri": "http://127.0.0.1:8788/api/oauth/meta/callback",
+    }
 
 
 async def save_and_test_meta(request: MetaSetupRequest) -> dict[str, Any]:
