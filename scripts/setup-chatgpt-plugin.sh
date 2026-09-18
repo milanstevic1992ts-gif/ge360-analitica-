@@ -16,8 +16,13 @@ echo "GE360 MCP pronto."
 echo "Ambiente MCP: $VENV"
 echo "API attesa: http://127.0.0.1:8788"
 echo
-echo "Avvia GE360 con:"
-echo "  docker compose up -d --build"
+if command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet ge360-analitica.service 2>/dev/null; then
+  echo "GE360 Analitica è già attivo come servizio systemd."
+else
+  echo "Verifica che GE360 Analitica sia attivo su http://127.0.0.1:8788"
+fi
 echo
-echo "Poi importa la cartella del repository come plugin locale in ChatGPT Desktop."
-echo "Il plugin non legge una copia del database: interroga la API GE360 locale in sola lettura."
+echo "Ora importa questa cartella come plugin locale in ChatGPT Desktop:"
+echo "  $ROOT"
+echo
+echo "Il plugin interroga GE360 in sola lettura tramite http://127.0.0.1:8788."
