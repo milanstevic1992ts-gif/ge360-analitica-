@@ -257,40 +257,42 @@ class MetaConnector(Connector):
         metrics: list[dict[str, Any]] = []
         skipped: dict[str, str] = {}
 
-        for metric in CANDIDATE_IG_MEDIA_METRICS:
-            response = await client.get(
-                f"{self.graph_base}/{media_id}/insights",
-                params={"metric": metric, "access_token": self.access_token},
-            )
-            if response.status_code >= 400:
-                try:
-                    skipped[metric] = response.json().get("error", {}).get("message", "") or f"HTTP {response.status_code}"
-                except Exception:
-                    skipped[metric] = f"HTTP {response.status_code}"
-                continue
+        response = await client.get(
+            f"{self.graph_base}/{media_id}/insights",
+            params={
+                "metric": ",".join(CANDIDATE_IG_MEDIA_METRICS),
+                "access_token": self.access_token,
+            },
+        )
+        if response.status_code >= 400:
+            try:
+                message = response.json().get("error", {}).get("message", "") or f"HTTP {response.status_code}"
+            except Exception:
+                message = f"HTTP {response.status_code}"
+            return [], {"media_insights": message}
 
-            payload = response.json()
-            for series in payload.get("data", []):
-                name = series.get("name") or metric
-                values = series.get("values") or []
-                if not values:
-                    continue
-                raw = values[-1].get("value")
-                if isinstance(raw, dict):
-                    continue
-                try:
-                    numeric = float(raw or 0)
-                except (TypeError, ValueError):
-                    continue
-                metrics.append(
-                    {
-                        "metric": f"instagram_media_{name}",
-                        "value": numeric,
-                        "dimension": "media_id",
-                        "dimension_value": media_id,
-                        "captured_at": captured_at,
-                    }
-                )
+        payload = response.json()
+        for series in payload.get("data", []):
+            name = series.get("name") or "unknown"
+            values = series.get("values") or []
+            if not values:
+                continue
+            raw = values[-1].get("value")
+            if isinstance(raw, dict):
+                continue
+            try:
+                numeric = float(raw or 0)
+            except (TypeError, ValueError):
+                continue
+            metrics.append(
+                {
+                    "metric": f"instagram_media_{name}",
+                    "value": numeric,
+                    "dimension": "media_id",
+                    "dimension_value": media_id,
+                    "captured_at": captured_at,
+                }
+            )
 
         return metrics, skipped
 
@@ -341,12 +343,13 @@ class MetaConnector(Connector):
         params: dict[str, Any] = {
             "fields": (
                 "id,caption,media_type,media_product_type,"
-                "permalink,timestamp"
+                "permalink,timestamp,like_count,comments_count"
             ),
             "limit": 100,
             "access_token": self.access_token,
         }
         content_items: list[dict[str, Any]] = []
+        detailed_insights_remaining = 50
 
         for _ in range(10):
             response = await client.get(url, params=params)
@@ -393,13 +396,14 @@ class MetaConnector(Connector):
                         except (TypeError, ValueError):
                             pass
 
-                if media_id:
+                if media_id and detailed_insights_remaining > 0:
                     insight_metrics, _ = await self._instagram_media_insights(
                         client,
                         media_id,
                         timestamp,
                     )
                     metrics.extend(insight_metrics)
+                    detailed_insights_remaining -= 1
 
             next_url = payload.get("paging", {}).get("next")
             if not next_url:
