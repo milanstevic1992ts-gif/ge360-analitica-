@@ -824,3 +824,64 @@ button { cursor: pointer; }
   .one-time-actions { flex-direction:column;align-items:stretch; }
   .one-time-actions > a,.one-time-actions > label { width:100%;justify-content:center; }
 }
+
+
+/* GE360 0.6 - Facebook SDK account selection */
+.facebook-login-action {
+  background: linear-gradient(135deg,#1877f2,#3559df);
+  border-color: rgba(68,124,255,.55);
+  box-shadow: 0 10px 28px rgba(24,119,242,.18);
+}
+.facebook-login-action:hover { filter:brightness(1.07); }
+
+.social-account-summary {
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:8px;
+  margin:12px 0 15px;
+}
+.social-account-summary > div {
+  padding:11px 12px;
+  border:1px solid var(--border);
+  border-radius:11px;
+  background:rgba(255,255,255,.018);
+  min-width:0;
+}
+.social-account-summary span {
+  display:block;
+  color:#5f6e85;
+  font-size:7px;
+  letter-spacing:.11em;
+  font-weight:800;
+}
+.social-account-summary strong {
+  display:block;
+  margin-top:5px;
+  color:#dfe7f6;
+  font-size:9px;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.selection-heading p {
+  margin:5px 0 0;
+  color:#68768d;
+  font-size:8px;
+  line-height:1.5;
+}
+.page-choice {
+  text-align:left;
+}
+.page-choice .instagram-found,
+.page-choice .instagram-missing {
+  margin-top:6px;
+}
+.page-choice .instagram-found {
+  display:flex;
+  align-items:center;
+  gap:5px;
+}
+
+@media (max-width: 700px) {
+  .social-account-summary { grid-template-columns:1fr; }
+}
