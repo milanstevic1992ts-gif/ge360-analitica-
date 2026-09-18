@@ -1,10 +1,10 @@
 # GE360 Analitica
 
-Centro dati self-hosted per riunire in un'unica dashboard i dati di **Facebook/Meta, Google Business Profile, WordPress, Google Analytics 4 e Google Search Console**.
+Centro dati self-hosted per riunire in un'unica dashboard i dati di **Facebook/Meta, Google Business Profile, WordPress, Google Analytics 4 e Google Search Console**, mantenendo ChatGPT come interfaccia intelligente tramite plugin MCP.
 
 ## Obiettivo
 
-GE360 Analitica non vuole essere l'ennesima dashboard con cinque riquadri separati. L'obiettivo è costruire un modello dati comune che permetta di leggere il percorso completo:
+GE360 Analitica costruisce un modello dati comune per leggere il percorso:
 
 ```
 Sorgente -> contenuto/pagina -> visita -> azione -> lead
@@ -12,9 +12,9 @@ Sorgente -> contenuto/pagina -> visita -> azione -> lead
 
 Esempi:
 
-- Google Search -> pagina "Ristrutturazione bagno Trieste" -> WhatsApp -> richiesta preventivo
-- Facebook Reel -> visita sito -> click telefono -> lead
-- Google Business Profile -> chiamata -> contatto
+- Google Search -> pagina servizio -> WhatsApp -> richiesta preventivo
+- Facebook -> visita sito -> telefono -> contatto
+- Google Business Profile -> click sito/chiamata -> visita/azione
 
 ## Principi
 
@@ -24,39 +24,83 @@ Esempi:
 - SQLite in partenza, PostgreSQL-ready
 - connettori indipendenti e sostituibili
 - API-first
-- dashboard veloce e leggibile
-- niente dipendenza da servizi SaaS per visualizzare i dati
-- integrazione con ChatGPT tramite plugin/app MCP: GE360 espone strumenti, ChatGPT resta la chat e il motore intelligente
+- dashboard veloce e responsive
+- sincronizzazione automatica
+- nessun modello AI incorporato
+- ChatGPT resta la chat e usa GE360 tramite strumenti MCP read-only
 
 ## Avvio rapido
 
 ```bash
 cp .env.example .env
-docker compose up --build
+docker compose up -d --build
 ```
 
-Dashboard: http://localhost:8788  
-API: http://localhost:8787  
-API docs: http://localhost:8787/docs
+Dashboard: http://127.0.0.1:8788  
+API: http://127.0.0.1:8787  
+API docs: http://127.0.0.1:8787/docs
 
-## Moduli previsti
+## Stato moduli
 
 | Modulo | Stato |
 |---|---|
-| Dashboard unificata | MVP |
-| Database storico | MVP |
-| Demo connector | MVP |
-| WordPress REST API | scaffolding |
-| Meta / Facebook Pages | scaffolding |
-| Google Business Profile | scaffolding |
-| Google Analytics 4 | scaffolding |
-| Search Console | scaffolding |
-| Funnel e attribuzione | MVP |
-| Alert / insight | MVP |
-| ChatGPT / GE360 MCP Plugin | MVP |
+| Dashboard live + fallback demo | Attivo |
+| SQLite storico metriche/eventi/lead | Attivo |
+| Sync automatico | Attivo |
+| WordPress contenuti | Attivo |
+| GE360 Tracker WordPress | Attivo, da installare sul sito |
+| GA4 | Implementato, richiede collegamento Google |
+| Search Console | Implementato, richiede collegamento Google |
+| Google Business Profile | Implementato, richiede accesso API Google |
+| Meta / Facebook Page | Implementato, richiede Page token e Page ID |
+| Funnel / attribuzione | Attivo |
+| Opportunity Radar | Attivo |
+| Anomaly Watch | Attivo |
+| Local SEO Radar | Attivo |
+| ChatGPT / GE360 MCP Plugin | Attivo |
+| Backup / export report | Roadmap |
+
+## WordPress tracker
+
+Il repository contiene un plugin WordPress privacy-first che registra:
+
+- page view
+- click WhatsApp
+- click telefono
+- click email
+- invio moduli
+- CTA esplicitamente marcate
+
+Non registra nome, email, telefono, contenuto dei moduli, IP o user-agent.
+
+GitHub Actions genera automaticamente `ge360-tracker.zip`.
+
+## Google
+
+GE360 usa un unico flusso OAuth locale per:
+
+- Google Analytics 4
+- Search Console
+- Google Business Profile Performance API
+
+La dashboard espone **Collega Google** e salva il refresh token solo sul server locale.
+
+## Meta
+
+Il connettore usa Graph API versionata e metriche Page Insights moderne, provandole singolarmente per evitare che una metrica rimossa blocchi l'intera sincronizzazione.
+
+## ChatGPT
+
+GE360 non chiama un modello via API.
+
+```
+ChatGPT -> plugin GE360 -> MCP locale -> API GE360 -> SQLite
+```
+
+Vedi [docs/CHATGPT_MCP.md](docs/CHATGPT_MCP.md).
 
 ## Ispirazione progettuale
 
-Il progetto prende spunti architetturali e UX da Plausible, PostHog, Mixpost, Metabase, Apache Superset e Matomo, ma l'implementazione di GE360 Analitica è originale e mirata a una singola attività locale.
+Il progetto prende spunti architetturali e UX da Plausible, PostHog, Mixpost, Metabase, Apache Superset e Matomo, ma l'implementazione di GE360 Analitica è specifica per questo progetto.
 
-Vedi [docs/INSPIRATION.md](docs/INSPIRATION.md), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) e [docs/CHATGPT_MCP.md](docs/CHATGPT_MCP.md).
+Vedi anche [docs/INSPIRATION.md](docs/INSPIRATION.md), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) e [docs/ROADMAP.md](docs/ROADMAP.md).
