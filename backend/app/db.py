@@ -82,6 +82,27 @@ CREATE TABLE IF NOT EXISTS content_items (
 
 CREATE INDEX IF NOT EXISTS idx_content_provider_type
 ON content_items(provider, content_type);
+
+CREATE TABLE IF NOT EXISTS local_ai_settings (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    base_url TEXT NOT NULL,
+    model TEXT NOT NULL,
+    think INTEGER NOT NULL DEFAULT 0,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS ai_reports (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    report_type TEXT NOT NULL,
+    period_days INTEGER NOT NULL,
+    model TEXT NOT NULL,
+    report_markdown TEXT NOT NULL,
+    handoff_prompt TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_ai_reports_created_at
+ON ai_reports(created_at DESC);
 """
 
 PROVIDERS = [
