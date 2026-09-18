@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import analytics, google_oauth, local_ai, setup_wizard
+from . import analytics, google_oauth, local_ai, setup_wizard, meta_oauth
 from .background import auto_sync_enabled, periodic_sync
 from .connectors.registry import diagnostics
 from .connectors.wordpress import WordPressConnector
@@ -17,7 +17,7 @@ from .sync import sync_all, sync_provider
 
 app = FastAPI(
     title="GE360 Analitica API",
-    version="0.4.0",
+    version="0.5.0",
     description="API centrale per analytics, attribuzione e connettori GE360.",
 )
 
@@ -55,7 +55,7 @@ async def shutdown() -> None:
 
 @app.get("/api/health")
 def health() -> dict:
-    return {"status": "ok", "service": "ge360-analitica", "version": "0.4.0"}
+    return {"status": "ok", "service": "ge360-analitica", "version": "0.5.0"}
 
 
 @app.get("/api/dashboard")
@@ -110,6 +110,46 @@ async def google_oauth_callback(code: str, state: str):
 @app.post("/api/oauth/google/disconnect")
 def google_oauth_disconnect() -> dict:
     google_oauth.disconnect()
+    return {"ok": True}
+
+
+@app.get("/api/oauth/meta/start")
+def meta_oauth_start() -> dict:
+    try:
+        return {"authorization_url": meta_oauth.authorization_url()}
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/api/oauth/meta/callback")
+async def meta_oauth_callback(code: str, state: str):
+    try:
+        await meta_oauth.exchange_code(code, state)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"OAuth Meta fallito: {exc}") from exc
+
+    return RedirectResponse("http://127.0.0.1:8788/?meta=connected", status_code=302)
+
+
+@app.get("/api/oauth/meta/pages")
+async def meta_oauth_pages() -> dict:
+    try:
+        return {"items": await meta_oauth.list_pages()}
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Lettura Pagine Meta fallita: {exc}") from exc
+
+
+@app.post("/api/oauth/meta/select-page")
+async def meta_oauth_select_page(request: meta_oauth.MetaPageSelectionRequest) -> dict:
+    try:
+        return await meta_oauth.select_page(request.page_id)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Selezione Pagina Meta fallita: {exc}") from exc
+
+
+@app.post("/api/oauth/meta/disconnect")
+def meta_oauth_disconnect() -> dict:
+    meta_oauth.disconnect()
     return {"ok": True}
 
 
@@ -221,6 +261,14 @@ async def setup_wordpress(request: setup_wizard.WordPressSetupRequest) -> dict:
 @app.post("/api/setup/google")
 def setup_google(request: setup_wizard.GoogleSetupRequest) -> dict:
     return setup_wizard.save_google(request)
+
+
+@app.post("/api/setup/google/import-oauth-json")
+def setup_google_import_oauth_json(request: setup_wizard.GoogleOAuthJsonRequest) -> dict:
+    try:
+        return setup_wizard.import_google_oauth_json(request)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @app.get("/api/setup/google/discover")
