@@ -15,7 +15,6 @@ _pending_states: set[str] = set()
 META_SCOPES = [
     "pages_show_list",
     "pages_read_engagement",
-    "read_insights",
     "instagram_basic",
     "instagram_manage_insights",
 ]
@@ -59,12 +58,15 @@ def redirect_uri() -> str:
 
 
 def public_config() -> dict:
+    config_id = get("META_BUSINESS_LOGIN_CONFIG_ID")
     return {
         "app_id": get("META_APP_ID"),
         "graph_version": _version(),
         "scopes": META_SCOPES,
         "sdk_ready": sdk_configured(),
         "server_oauth_ready": server_oauth_configured(),
+        "business_login_ready": bool(config_id),
+        "business_login_config_id": config_id,
         "redirect_uri": redirect_uri(),
     }
 
@@ -84,8 +86,16 @@ def authorization_url() -> str:
         "redirect_uri": redirect_uri(),
         "state": state,
         "response_type": "code",
-        "scope": ",".join(META_SCOPES),
     }
+
+    config_id = get("META_BUSINESS_LOGIN_CONFIG_ID")
+    if config_id:
+        # Facebook Login for Business usa una Configuration ID creata nella
+        # dashboard Meta. I permessi vivono nella configurazione, non nell'URL.
+        params["config_id"] = config_id
+    else:
+        # Fallback per app legacy/classic Facebook Login.
+        params["scope"] = ",".join(META_SCOPES)
 
     return (
         f"https://www.facebook.com/{_version()}/dialog/oauth?"
