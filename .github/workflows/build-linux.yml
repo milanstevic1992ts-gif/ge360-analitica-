@@ -28,6 +28,11 @@ jobs:
           pip install -r backend/requirements.txt
           pip install pyinstaller
 
+      - name: Test Meta pagination and compile backend
+        run: |
+          PYTHONPATH=backend python -m unittest discover -s backend/tests -p 'test_*.py' -v
+          python -m compileall -q backend
+
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
@@ -173,21 +178,45 @@ jobs:
           test -f /lib/systemd/system/ge360-analitica.service
           test -f /opt/ge360-analitica/www/index.html
 
-          # Simula dati/configurazione già presenti prima di un aggiornamento.
-          sudo mkdir -p /var/lib/ge360-analitica
-          echo "persistent-db-marker" | sudo tee /var/lib/ge360-analitica/upgrade-marker >/dev/null
-          echo "# user-setting-must-survive" | sudo tee -a /etc/ge360-analitica/ge360.env >/dev/null
+          # Simula dati/configurazione/token già presenti prima di un aggiornamento.
+          sudo systemctl stop ge360-analitica.service || true
           sudo mkdir -p /var/lib/ge360-analitica/secrets
-          echo '{"WIZARD_TEST":"survive-upgrade"}' | sudo tee /var/lib/ge360-analitica/secrets/runtime_config.json >/dev/null
-          sudo chown ge360:ge360 /var/lib/ge360-analitica/secrets/runtime_config.json
-          sudo chmod 600 /var/lib/ge360-analitica/secrets/runtime_config.json
+          echo "# user-setting-must-survive" | sudo tee -a /etc/ge360-analitica/ge360.env >/dev/null
+          echo '{"WIZARD_TEST":"survive-upgrade","META_USER_ACCESS_TOKEN":"meta-user-token-survive","META_PAGE_ACCESS_TOKEN":"meta-page-token-survive"}' | sudo tee /var/lib/ge360-analitica/secrets/runtime_config.json >/dev/null
+          echo '{"access_token":"google-token-survive","refresh_token":"google-refresh-survive"}' | sudo tee /var/lib/ge360-analitica/secrets/google_oauth.json >/dev/null
+          sudo chown ge360:ge360 /var/lib/ge360-analitica/secrets/runtime_config.json /var/lib/ge360-analitica/secrets/google_oauth.json
+          sudo chmod 600 /var/lib/ge360-analitica/secrets/runtime_config.json /var/lib/ge360-analitica/secrets/google_oauth.json
+
+          sudo python - <<'PY'
+          import sqlite3
+          path = "/var/lib/ge360-analitica/ge360.db"
+          db = sqlite3.connect(path)
+          db.execute("CREATE TABLE IF NOT EXISTS upgrade_persistence_test (marker TEXT NOT NULL)")
+          db.execute("DELETE FROM upgrade_persistence_test")
+          db.execute("INSERT INTO upgrade_persistence_test(marker) VALUES (?)", ("database-survive-upgrade",))
+          db.commit()
+          db.close()
+          PY
+          sudo chown ge360:ge360 /var/lib/ge360-analitica/ge360.db
 
           # Reinstalla/aggiorna sopra l'installazione esistente.
           sudo dpkg -i dist/ge360-analitica_0.6.3_amd64.deb
 
-          sudo grep "persistent-db-marker" /var/lib/ge360-analitica/upgrade-marker
           sudo grep "user-setting-must-survive" /etc/ge360-analitica/ge360.env
           sudo grep "survive-upgrade" /var/lib/ge360-analitica/secrets/runtime_config.json
+          sudo grep "meta-user-token-survive" /var/lib/ge360-analitica/secrets/runtime_config.json
+          sudo grep "meta-page-token-survive" /var/lib/ge360-analitica/secrets/runtime_config.json
+          sudo grep "google-token-survive" /var/lib/ge360-analitica/secrets/google_oauth.json
+          sudo python - <<'PY' | grep "database-survive-upgrade"
+          import sqlite3
+          db = sqlite3.connect("/var/lib/ge360-analitica/ge360.db")
+          print(db.execute("SELECT marker FROM upgrade_persistence_test LIMIT 1").fetchone()[0])
+          db.close()
+          PY
+
+      - name: SHA256 Linux package
+        run: |
+          sha256sum dist/ge360-analitica_0.6.3_amd64.deb | tee dist/ge360-analitica_0.6.3_amd64.deb.sha256
 
       - name: Upload Linux packages
         uses: actions/upload-artifact@v4
@@ -195,5 +224,6 @@ jobs:
           name: ge360-analitica-linux-amd64
           path: |
             dist/ge360-analitica_0.6.3_amd64.deb
+            dist/ge360-analitica_0.6.3_amd64.deb.sha256
             dist/ge360-analitica-linux-amd64-0.6.3.tar.gz
           retention-days: 30
