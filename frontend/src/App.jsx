@@ -122,8 +122,8 @@ function App() {
         <div className="sidebar-card">
           <Sparkles size={18} />
           <strong>GE360 Intelligence</strong>
-          <p>Gli insight AI verranno attivati quando collegheremo Ollama/Qwen.</p>
-          <span>Motore locale · roadmap</span>
+          <p>Gli insight AI useranno Codex CLI collegato al tuo account ChatGPT.</p>
+          <span>ChatGPT Agent · CLI</span>
         </div>
       </aside>
 
