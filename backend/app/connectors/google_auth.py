@@ -5,6 +5,8 @@ from pathlib import Path
 
 import httpx
 
+from ..config_store import get as config_get
+
 
 TOKEN_FILE = Path(
     os.getenv("GE360_GOOGLE_TOKEN_FILE", "/data/secrets/google_oauth.json")
@@ -16,11 +18,11 @@ class GoogleAuth:
     _expires_at: float = 0
 
     def __init__(self) -> None:
-        self.client_id = os.getenv("GOOGLE_CLIENT_ID", "")
-        self.client_secret = os.getenv("GOOGLE_CLIENT_SECRET", "")
+        self.client_id = config_get("GOOGLE_CLIENT_ID")
+        self.client_secret = config_get("GOOGLE_CLIENT_SECRET")
 
     def _stored_refresh_token(self) -> str:
-        env_token = os.getenv("GOOGLE_REFRESH_TOKEN", "").strip()
+        env_token = config_get("GOOGLE_REFRESH_TOKEN").strip()
         if env_token:
             return env_token
 
