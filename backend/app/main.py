@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import analytics, google_oauth
+from . import analytics, google_oauth, local_ai
 from .background import auto_sync_enabled, periodic_sync
 from .connectors.registry import diagnostics
 from .connectors.wordpress import WordPressConnector
@@ -17,7 +17,7 @@ from .sync import sync_all, sync_provider
 
 app = FastAPI(
     title="GE360 Analitica API",
-    version="0.2.1",
+    version="0.3.0",
     description="API centrale per analytics, attribuzione e connettori GE360.",
 )
 
@@ -55,7 +55,7 @@ async def shutdown() -> None:
 
 @app.get("/api/health")
 def health() -> dict:
-    return {"status": "ok", "service": "ge360-analitica", "version": "0.2.1"}
+    return {"status": "ok", "service": "ge360-analitica", "version": "0.3.0"}
 
 
 @app.get("/api/dashboard")
@@ -205,27 +205,48 @@ def analytics_local_seo(
     return analytics.local_seo(days=days, contains=contains, limit=limit)
 
 
-@app.get("/api/integrations/chatgpt")
-def chatgpt_integration() -> dict:
-    plugin_dir = Path(
-        os.getenv(
-            "GE360_CHATGPT_PLUGIN_DIR",
-            "/opt/ge360-analitica/chatgpt-plugin",
-        )
-    )
-    return {
-        "mode": "ChatGPT Desktop + MCP",
-        "embedded_chat": False,
-        "api_key_required": False,
-        "plugin_bundled": (plugin_dir / "plugin.json").is_file(),
-        "plugin_path": str(plugin_dir),
-        "setup_command": "ge360-chatgpt-setup",
-        "chatgpt_url": "https://chatgpt.com/",
-        "note": (
-            "GE360 non incorpora una copia di ChatGPT. "
-            "ChatGPT resta la normale app/chat e usa GE360 tramite il plugin MCP."
-        ),
-    }
+@app.get("/api/local-ai/status")
+async def local_ai_status() -> dict:
+    return await local_ai.status()
+
+
+@app.post("/api/local-ai/configure")
+def local_ai_configure(request: local_ai.LocalAIConfigureRequest) -> dict:
+    try:
+        return local_ai.save_settings(request)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/api/local-ai/test")
+async def local_ai_test() -> dict:
+    result = await local_ai.status()
+    if not result["ok"]:
+        raise HTTPException(status_code=502, detail=result["message"])
+    if not result["selected_available"]:
+        raise HTTPException(status_code=400, detail=result["message"])
+    return result
+
+
+@app.post("/api/local-ai/report")
+async def local_ai_report(request: local_ai.LocalAIReportRequest) -> dict:
+    try:
+        return await local_ai.generate_report(request)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Analisi locale fallita: {exc}") from exc
+
+
+@app.get("/api/local-ai/reports")
+def local_ai_reports(limit: int = Query(20, ge=1, le=100)) -> dict:
+    return {"items": local_ai.reports(limit=limit)}
+
+
+@app.get("/api/local-ai/reports/{report_id}")
+def local_ai_report_detail(report_id: int) -> dict:
+    result = local_ai.report(report_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Report non trovato")
+    return result
 
 
 @app.get("/api/info")
