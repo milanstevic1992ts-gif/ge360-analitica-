@@ -130,6 +130,7 @@ function SetupWizardPage({ onFinish }) {
     app_secret: '',
     graph_version: 'v26.0',
     redirect_uri: '',
+    business_login_config_id: '',
   })
 
   const current = steps[step]
@@ -197,6 +198,8 @@ function SetupWizardPage({ onFinish }) {
         app_id: metaAppId,
         graph_version: metaVersion,
         redirect_uri: payload.meta?.META_REDIRECT_URI?.value || prev.redirect_uri,
+        business_login_config_id:
+          payload.meta?.META_BUSINESS_LOGIN_CONFIG_ID?.value || prev.business_login_config_id,
       }))
 
       if (metaAppId) {
@@ -451,11 +454,11 @@ function SetupWizardPage({ onFinish }) {
       })
       const payload = await response.json()
       if (!response.ok) throw new Error(payload.detail || 'Configurazione Meta non salvata')
-      setMessage(
+      setMessage(payload.message || (
         payload.sdk_ready
-          ? 'Meta App ID salvato. Preparo Facebook Login…'
+          ? 'Configurazione Meta salvata.'
           : 'Inserisci il Meta App ID.'
-      )
+      ))
       await loadStatus()
       if (payload.sdk_ready) {
         const ready = await prepareFacebookSdk(meta.app_id, meta.graph_version || 'v26.0')
@@ -870,21 +873,27 @@ function SetupWizardPage({ onFinish }) {
                     {status?.meta?.META_USER_ACCESS_TOKEN?.configured
                       ? `Profilo: ${status?.meta?.META_USER_NAME?.value || 'collegato'}`
                       : status?.meta?.META_APP_SECRET?.configured
-                        ? 'OAuth server pronto: il login passa dal callback HTTPS e non usa il JavaScript SDK.'
+                        ? (status?.meta?.META_BUSINESS_LOGIN_CONFIG_ID?.configured
+                            ? 'Facebook Login for Business pronto: GE360 usa la Configuration ID di Meta.'
+                            : 'App ID e Secret salvati. Manca la Configuration ID di Facebook Login for Business.')
                         : 'Niente Page ID o token da copiare. Senza App Secret viene usato il JavaScript SDK.'}
                   </p>
                 </div>
                 <button
                   className="primary-action login-action facebook-login-action"
                   onClick={connectMeta}
-                  disabled={Boolean(busy) || !status?.meta?.META_APP_ID?.configured || !facebookSdkReady}
+                  disabled={
+                    Boolean(busy) ||
+                    !status?.meta?.META_APP_ID?.configured ||
+                    (!status?.meta?.META_APP_SECRET?.configured && !facebookSdkReady)
+                  }
                 >
                   <LogIn size={15} /> {
-                    !facebookSdkReady
-                      ? 'Preparo Facebook…'
-                      : status?.meta?.META_USER_ACCESS_TOKEN?.configured
-                        ? 'Ricollega Facebook'
-                        : 'Accedi con Facebook'
+                    status?.meta?.META_APP_SECRET?.configured
+                      ? (status?.meta?.META_USER_ACCESS_TOKEN?.configured ? 'Ricollega Facebook' : 'Accedi con Facebook')
+                      : (!facebookSdkReady
+                          ? 'Preparo Facebook…'
+                          : (status?.meta?.META_USER_ACCESS_TOKEN?.configured ? 'Ricollega Facebook' : 'Accedi con Facebook'))
                   }
                 </button>
               </div>
@@ -940,6 +949,16 @@ function SetupWizardPage({ onFinish }) {
                       hint="Non serve per Accedi con Facebook. Usalo solo se in futuro vuoi il flusso OAuth server/long-lived."
                     >
                       <input type="password" value={meta.app_secret} onChange={(e) => setMeta({ ...meta, app_secret: e.target.value })} />
+                    </Field>
+                    <Field
+                      label="Facebook Login for Business · Configuration ID"
+                      hint="Creala in Meta → Facebook Login for Business → Configurations. Con questa GE360 non invia più i permessi come scope nell'URL."
+                    >
+                      <input
+                        value={meta.business_login_config_id}
+                        placeholder="Configuration ID"
+                        onChange={(e) => setMeta({ ...meta, business_login_config_id: e.target.value.trim() })}
+                      />
                     </Field>
                     <Field label="Callback HTTPS Meta">
                       <input
