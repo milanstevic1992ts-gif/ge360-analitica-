@@ -8,7 +8,7 @@
         "${PLUGIN_ROOT}/scripts/run-mcp.sh"
       ],
       "env": {
-        "GE360_API_BASE": "http://127.0.0.1:8787"
+        "GE360_API_BASE": "http://127.0.0.1:8788"
       },
       "cwd": "${PLUGIN_ROOT}"
     }
