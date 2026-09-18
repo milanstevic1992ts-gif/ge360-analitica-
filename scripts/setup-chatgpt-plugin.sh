@@ -2,7 +2,10 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-VENV="$ROOT/.venv"
+STATE_DIR="$HOME/.local/share/ge360-analitica"
+VENV="$STATE_DIR/mcp-venv"
+
+mkdir -p "$STATE_DIR"
 
 python3 -m venv "$VENV"
 "$VENV/bin/pip" install --upgrade pip
@@ -10,7 +13,11 @@ python3 -m venv "$VENV"
 
 echo
 echo "GE360 MCP pronto."
-echo "Plugin root: $ROOT"
+echo "Ambiente MCP: $VENV"
+echo "API attesa: http://127.0.0.1:8787"
 echo
-echo "Ora importa questa cartella come plugin locale in ChatGPT Desktop."
-echo "Il server MCP è in sola lettura e userà: $ROOT/data/ge360.db"
+echo "Avvia GE360 con:"
+echo "  docker compose up -d --build"
+echo
+echo "Poi importa la cartella del repository come plugin locale in ChatGPT Desktop."
+echo "Il plugin non legge una copia del database: interroga la API GE360 locale in sola lettura."
