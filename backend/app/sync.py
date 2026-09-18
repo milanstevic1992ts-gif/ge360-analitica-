@@ -4,6 +4,7 @@ from typing import Any
 
 from .connectors.ga4 import GA4Connector
 from .connectors.google_business import GoogleBusinessConnector
+from .connectors.meta import MetaConnector
 from .connectors.search_console import SearchConsoleConnector
 from .connectors.wordpress import WordPressConnector
 from .db import get_cursor, persist_result, set_connector_state
@@ -14,6 +15,7 @@ CONNECTORS = {
     "ga4": GA4Connector,
     "search_console": SearchConsoleConnector,
     "google_business": GoogleBusinessConnector,
+    "meta": MetaConnector,
 }
 
 
