@@ -238,68 +238,115 @@ async def connect_browser_session(request: MetaSessionRequest) -> dict:
     }
 
 
-async def list_pages() -> list[dict]:
+MAX_PAGE_API_CALLS = 20
+MAX_TOTAL_PAGES = 1000
+
+_META_PAGE_FIELDS = (
+    "id,name,access_token,category,"
+    "instagram_business_account{id,username,followers_count,media_count}"
+)
+
+
+async def _fetch_account_pages() -> list[dict]:
+    """Load every Facebook Page exposed by /me/accounts with hard safety caps."""
     token = get("META_USER_ACCESS_TOKEN")
     if not token:
         return []
 
-    async with httpx.AsyncClient(timeout=25, follow_redirects=True) as client:
-        response = await client.get(
-            f"https://graph.facebook.com/{_version()}/me/accounts",
-            params={
-                "fields": (
-                    "id,name,access_token,category,"
-                    "instagram_business_account{id,username,followers_count,media_count}"
-                ),
-                "limit": 100,
-                "access_token": token,
-            },
-        )
-        response.raise_for_status()
-        payload = response.json()
+    base_url = f"https://graph.facebook.com/{_version()}/me/accounts"
+    base_params = {
+        "fields": _META_PAGE_FIELDS,
+        "limit": 100,
+        "access_token": token,
+    }
 
-    pages = []
-    for item in payload.get("data", []):
-        ig = item.get("instagram_business_account") or {}
-        pages.append(
-            {
-                "id": str(item.get("id") or ""),
-                "name": item.get("name"),
-                "category": item.get("category"),
-                "instagram": {
-                    "connected": bool(ig.get("id")),
-                    "id": str(ig.get("id") or "") or None,
-                    "username": ig.get("username"),
-                    "followers_count": ig.get("followers_count"),
-                    "media_count": ig.get("media_count"),
-                },
-            }
+    pages_by_id: dict[str, dict] = {}
+    next_url: str | None = base_url
+    next_params: dict | None = dict(base_params)
+    api_calls = 0
+
+    async with httpx.AsyncClient(timeout=25, follow_redirects=True) as client:
+        while next_url and api_calls < MAX_PAGE_API_CALLS and len(pages_by_id) < MAX_TOTAL_PAGES:
+            response = await client.get(next_url, params=next_params)
+            response.raise_for_status()
+            payload = response.json()
+            api_calls += 1
+
+            for item in payload.get("data", []):
+                page_id = str(item.get("id") or "").strip()
+                if not page_id or page_id in pages_by_id:
+                    continue
+                pages_by_id[page_id] = item
+                if len(pages_by_id) >= MAX_TOTAL_PAGES:
+                    break
+
+            if len(pages_by_id) >= MAX_TOTAL_PAGES:
+                break
+
+            paging = payload.get("paging") or {}
+            next_link = str(paging.get("next") or "").strip()
+            cursors = paging.get("cursors") or {}
+            after = str(cursors.get("after") or "").strip()
+
+            if next_link:
+                # Meta's paging.next is a complete Graph URL. It stays server-side
+                # and is never returned to the browser.
+                next_url = next_link
+                next_params = None
+            elif after:
+                next_url = base_url
+                next_params = {**base_params, "after": after}
+            else:
+                next_url = None
+
+    return list(pages_by_id.values())
+
+
+def _safe_instagram_account(item: dict) -> dict | None:
+    ig = item.get("instagram_business_account") or {}
+    ig_id = str(ig.get("id") or "").strip()
+    if not ig_id:
+        return None
+    return {
+        "id": ig_id,
+        "username": ig.get("username"),
+        "followers_count": ig.get("followers_count"),
+        "media_count": ig.get("media_count"),
+    }
+
+
+def _public_page(item: dict) -> dict:
+    ig = _safe_instagram_account(item)
+    return {
+        "id": str(item.get("id") or ""),
+        "name": item.get("name"),
+        "category": item.get("category"),
+        "instagram_business_account": ig,
+        # Compatibilità con il frontend esistente.
+        "instagram": {
+            "connected": bool(ig),
+            "id": ig.get("id") if ig else None,
+            "username": ig.get("username") if ig else None,
+            "followers_count": ig.get("followers_count") if ig else None,
+            "media_count": ig.get("media_count") if ig else None,
+        },
+    }
+
+
+async def list_pages() -> list[dict]:
+    pages = [_public_page(item) for item in await _fetch_account_pages()]
+    pages.sort(
+        key=lambda page: (
+            str(page.get("name") or "").casefold(),
+            str(page.get("id") or ""),
         )
+    )
     return pages
 
 
 async def _page_details(page_id: str) -> dict:
-    token = get("META_USER_ACCESS_TOKEN")
-    if not token:
-        raise RuntimeError("Sessione Facebook non disponibile. Rifai Accedi con Facebook.")
-
-    async with httpx.AsyncClient(timeout=25, follow_redirects=True) as client:
-        accounts = await client.get(
-            f"https://graph.facebook.com/{_version()}/me/accounts",
-            params={
-                "fields": (
-                    "id,name,access_token,category,"
-                    "instagram_business_account{id,username,followers_count,media_count}"
-                ),
-                "limit": 100,
-                "access_token": token,
-            },
-        )
-        accounts.raise_for_status()
-        payload = accounts.json()
-
-    for item in payload.get("data", []):
-        if str(item.get("id")) == page_id:
+    for item in await _fetch_account_pages():
+        if str(item.get("id") or "") == page_id:
             return item
 
     raise RuntimeError("Pagina Facebook non trovata tra quelle autorizzate")
