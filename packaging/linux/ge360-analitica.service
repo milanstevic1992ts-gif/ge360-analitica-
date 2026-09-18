@@ -9,7 +9,6 @@ User=ge360
 Group=ge360
 EnvironmentFile=-/etc/ge360-analitica/ge360.env
 Environment=GE360_FRONTEND_DIR=/opt/ge360-analitica/www
-Environment=GE360_CHATGPT_PLUGIN_DIR=/opt/ge360-analitica/chatgpt-plugin
 Environment=TMPDIR=/var/lib/ge360-analitica/tmp
 WorkingDirectory=/var/lib/ge360-analitica
 ExecStart=/usr/bin/ge360-analitica serve --host 127.0.0.1 --port 8788
