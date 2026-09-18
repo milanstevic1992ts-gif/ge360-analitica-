@@ -1,0 +1,10 @@
+#!/bin/sh
+set -e
+
+URL="http://127.0.0.1:8788"
+
+if command -v xdg-open >/dev/null 2>&1; then
+    exec xdg-open "$URL"
+fi
+
+echo "Apri nel browser: $URL"
