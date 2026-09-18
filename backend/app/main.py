@@ -279,6 +279,11 @@ async def setup_google_discover() -> dict:
         raise HTTPException(status_code=502, detail=f"Scoperta Google fallita: {exc}") from exc
 
 
+@app.post("/api/setup/meta/credentials")
+def setup_meta_credentials(request: setup_wizard.MetaCredentialsRequest) -> dict:
+    return setup_wizard.save_meta_credentials(request)
+
+
 @app.post("/api/setup/meta")
 async def setup_meta(request: setup_wizard.MetaSetupRequest) -> dict:
     try:
