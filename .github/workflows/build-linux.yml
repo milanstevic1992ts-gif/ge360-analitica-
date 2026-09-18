@@ -79,17 +79,17 @@ jobs:
 
       - name: Build DEB and portable archive
         env:
-          GE360_VERSION: "0.2.0"
+          GE360_VERSION: "0.2.1"
           GE360_ARCH: amd64
         run: |
           chmod +x scripts/build-linux-package.sh
           scripts/build-linux-package.sh
-          dpkg-deb --info dist/ge360-analitica_0.2.0_amd64.deb
-          dpkg-deb --contents dist/ge360-analitica_0.2.0_amd64.deb | head -80
+          dpkg-deb --info dist/ge360-analitica_0.2.1_amd64.deb
+          dpkg-deb --contents dist/ge360-analitica_0.2.1_amd64.deb | head -80
 
       - name: Test DEB install
         run: |
-          sudo dpkg -i dist/ge360-analitica_0.2.0_amd64.deb
+          sudo dpkg -i dist/ge360-analitica_0.2.1_amd64.deb
           /usr/bin/ge360-analitica version
           test -f /etc/ge360-analitica/ge360.env
           test -f /lib/systemd/system/ge360-analitica.service
@@ -101,6 +101,6 @@ jobs:
         with:
           name: ge360-analitica-linux-amd64
           path: |
-            dist/ge360-analitica_0.2.0_amd64.deb
-            dist/ge360-analitica-linux-amd64-0.2.0.tar.gz
+            dist/ge360-analitica_0.2.1_amd64.deb
+            dist/ge360-analitica-linux-amd64-0.2.1.tar.gz
           retention-days: 30
