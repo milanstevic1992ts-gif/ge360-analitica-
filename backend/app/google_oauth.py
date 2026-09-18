@@ -5,6 +5,7 @@ from urllib.parse import urlencode
 import httpx
 
 from .connectors.google_auth import GoogleAuth
+from .config_store import get as config_get
 
 
 AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
@@ -20,9 +21,9 @@ _pending_states: set[str] = set()
 
 def configured() -> bool:
     return bool(
-        os.getenv("GOOGLE_CLIENT_ID", "")
-        and os.getenv("GOOGLE_CLIENT_SECRET", "")
-        and os.getenv("GOOGLE_REDIRECT_URI", "")
+        config_get("GOOGLE_CLIENT_ID")
+        and config_get("GOOGLE_CLIENT_SECRET")
+        and config_get("GOOGLE_REDIRECT_URI")
     )
 
 
@@ -36,8 +37,8 @@ def authorization_url() -> str:
     _pending_states.add(state)
 
     params = {
-        "client_id": os.getenv("GOOGLE_CLIENT_ID"),
-        "redirect_uri": os.getenv("GOOGLE_REDIRECT_URI"),
+        "client_id": config_get("GOOGLE_CLIENT_ID"),
+        "redirect_uri": config_get("GOOGLE_REDIRECT_URI"),
         "response_type": "code",
         "scope": " ".join(SCOPES),
         "access_type": "offline",
@@ -59,9 +60,9 @@ async def exchange_code(code: str, state: str) -> dict:
             TOKEN_URL,
             data={
                 "code": code,
-                "client_id": os.getenv("GOOGLE_CLIENT_ID"),
-                "client_secret": os.getenv("GOOGLE_CLIENT_SECRET"),
-                "redirect_uri": os.getenv("GOOGLE_REDIRECT_URI"),
+                "client_id": config_get("GOOGLE_CLIENT_ID"),
+                "client_secret": config_get("GOOGLE_CLIENT_SECRET"),
+                "redirect_uri": config_get("GOOGLE_REDIRECT_URI"),
                 "grant_type": "authorization_code",
             },
         )
