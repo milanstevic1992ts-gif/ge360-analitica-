@@ -227,7 +227,7 @@ function App() {
 
         <div className="sidebar-section">
           <span className="section-label">FONTI DATI</span>
-          <SourceStatus icon={Share2} label="Meta" status={connectors.find((c) => c.provider === 'meta')?.status} />
+          <SourceStatus icon={Share2} label="Meta / Instagram" status={connectors.find((c) => c.provider === 'meta')?.status} />
           <SourceStatus icon={Building2} label="Google Business" status={connectors.find((c) => c.provider === 'google_business')?.status} />
           <SourceStatus icon={Globe2} label="WordPress" status={connectors.find((c) => c.provider === 'wordpress')?.status} />
           <SourceStatus icon={Activity} label="Analytics 4" status={connectors.find((c) => c.provider === 'ga4')?.status} />
@@ -791,7 +791,7 @@ function connectorDescription(provider) {
     ga4: 'Sessioni, utenti, landing page e key events.',
     search_console: 'Query, click, impression, CTR e posizione.',
     google_business: 'Search/Maps, chiamate, sito, indicazioni e keyword.',
-    meta: 'Facebook Page Insights e contenuti.',
+    meta: 'Facebook Page + account Instagram professionale collegato.',
   })[provider] || ''
 }
 
