@@ -98,10 +98,16 @@ def _visibility(start: str, end: str) -> float:
         dimension="query",
     )
     meta = _metric_sum(
-        ["meta_page_media_view", "meta_page_total_media_view_unique"],
+        ["meta_page_media_view"],
         start,
         end,
     )
+    if not meta:
+        meta = _metric_sum(
+            ["meta_page_total_media_view_unique"],
+            start,
+            end,
+        )
     gbp = _metric_sum(
         [
             "gbp_business_impressions_desktop_maps",
