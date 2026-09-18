@@ -129,6 +129,7 @@ function SetupWizardPage({ onFinish }) {
     app_id: '',
     app_secret: '',
     graph_version: 'v26.0',
+    redirect_uri: '',
   })
 
   const current = steps[step]
@@ -195,6 +196,7 @@ function SetupWizardPage({ onFinish }) {
         ...prev,
         app_id: metaAppId,
         graph_version: metaVersion,
+        redirect_uri: payload.meta?.META_REDIRECT_URI?.value || prev.redirect_uri,
       }))
 
       if (metaAppId) {
@@ -470,7 +472,7 @@ function SetupWizardPage({ onFinish }) {
     }
   }
 
-  const connectMeta = () => {
+  const connectMeta = async () => {
     setMessage('')
 
     const appId = status?.meta?.META_APP_ID?.value || meta.app_id
@@ -479,8 +481,25 @@ function SetupWizardPage({ onFinish }) {
       return
     }
 
+    // Se App Secret è disponibile usiamo il normale OAuth server-side:
+    // è più robusto del JS SDK e non dipende dalla pagina locale aperta in HTTPS.
+    if (status?.meta?.META_APP_SECRET?.configured) {
+      setBusy('meta-login')
+      try {
+        const response = await fetch('/api/oauth/meta/start')
+        const payload = await response.json()
+        if (!response.ok) throw new Error(payload.detail || 'Facebook OAuth non configurato')
+        window.location.href = payload.authorization_url
+        return
+      } catch (error) {
+        setMessage(error.message)
+        setBusy('')
+        return
+      }
+    }
+
     if (window.location.protocol !== 'https:' && !['127.0.0.1', 'localhost'].includes(window.location.hostname)) {
-      setMessage('Apri GE360 tramite il tuo indirizzo HTTPS Tailscale prima di accedere con Facebook.')
+      setMessage('Senza App Secret, il login Facebook JavaScript richiede GE360 aperto in HTTPS.')
       return
     }
 
@@ -850,7 +869,9 @@ function SetupWizardPage({ onFinish }) {
                   <p>
                     {status?.meta?.META_USER_ACCESS_TOKEN?.configured
                       ? `Profilo: ${status?.meta?.META_USER_NAME?.value || 'collegato'}`
-                      : 'Niente Page ID, token o App Secret da copiare nel percorso normale.'}
+                      : status?.meta?.META_APP_SECRET?.configured
+                        ? 'OAuth server pronto: il login passa dal callback HTTPS e non usa il JavaScript SDK.'
+                        : 'Niente Page ID o token da copiare. Senza App Secret viene usato il JavaScript SDK.'}
                   </p>
                 </div>
                 <button
@@ -919,6 +940,13 @@ function SetupWizardPage({ onFinish }) {
                       hint="Non serve per Accedi con Facebook. Usalo solo se in futuro vuoi il flusso OAuth server/long-lived."
                     >
                       <input type="password" value={meta.app_secret} onChange={(e) => setMeta({ ...meta, app_secret: e.target.value })} />
+                    </Field>
+                    <Field label="Callback HTTPS Meta">
+                      <input
+                        value={meta.redirect_uri}
+                        placeholder="https://ge360-server....ts.net/api/oauth/meta/callback"
+                        onChange={(e) => setMeta({ ...meta, redirect_uri: e.target.value })}
+                      />
                     </Field>
                     <Field label="Graph API">
                       <input value={meta.graph_version} onChange={(e) => setMeta({ ...meta, graph_version: e.target.value })} />
