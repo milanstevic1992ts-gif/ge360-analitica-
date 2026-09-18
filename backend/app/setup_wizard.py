@@ -6,7 +6,7 @@ import httpx
 from pydantic import BaseModel, Field
 
 from . import local_ai
-from .config_store import get, has_value, set_many, snapshot
+from .config_store import get, set_many, snapshot
 from .connectors.google_auth import GoogleAuth
 from .connectors.meta import MetaConnector
 from .connectors.wordpress import WordPressConnector
@@ -117,7 +117,7 @@ async def save_and_test_wordpress(request: WordPressSetupRequest) -> dict[str, A
     return {
         "ok": result.ok,
         "message": result.message,
-        "tracker_configured": tracker_configured,
+        "tracker_configured": bool(get("WORDPRESS_GE360_KEY")),
         "metrics": result.metrics,
     }
 
@@ -135,7 +135,7 @@ def save_google(request: GoogleSetupRequest) -> dict[str, Any]:
     set_many(values)
     return {
         "ok": True,
-        "oauth_ready": bool(request.client_id and request.client_secret),
+        "oauth_ready": bool(get("GOOGLE_CLIENT_ID") and get("GOOGLE_CLIENT_SECRET")),
         "saved": snapshot(list(values.keys())),
     }
 
