@@ -21,6 +21,21 @@ jobs:
         working-directory: backend
         run: python -c "from app.main import app; print(app.title)"
 
+  plugin:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate shell launchers
+        run: bash -n scripts/run-mcp.sh scripts/setup-chatgpt-plugin.sh
+      - name: Validate Agent Plugin manifests
+        run: |
+          pip install check-jsonschema
+          check-jsonschema --schemafile https://agent-plugins.org/schemas/1.0.0/plugin.schema.json plugin.json
+          check-jsonschema --schemafile https://agent-plugins.org/schemas/1.0.0/mcp.schema.json mcp.json
+
   mcp:
     runs-on: ubuntu-latest
     steps:
