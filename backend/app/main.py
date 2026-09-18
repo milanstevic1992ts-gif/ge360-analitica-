@@ -205,6 +205,29 @@ def analytics_local_seo(
     return analytics.local_seo(days=days, contains=contains, limit=limit)
 
 
+@app.get("/api/integrations/chatgpt")
+def chatgpt_integration() -> dict:
+    plugin_dir = Path(
+        os.getenv(
+            "GE360_CHATGPT_PLUGIN_DIR",
+            "/opt/ge360-analitica/chatgpt-plugin",
+        )
+    )
+    return {
+        "mode": "ChatGPT Desktop + MCP",
+        "embedded_chat": False,
+        "api_key_required": False,
+        "plugin_bundled": (plugin_dir / "plugin.json").is_file(),
+        "plugin_path": str(plugin_dir),
+        "setup_command": "ge360-chatgpt-setup",
+        "chatgpt_url": "https://chatgpt.com/",
+        "note": (
+            "GE360 non incorpora una copia di ChatGPT. "
+            "ChatGPT resta la normale app/chat e usa GE360 tramite il plugin MCP."
+        ),
+    }
+
+
 @app.get("/api/info")
 def root() -> dict:
     return {
