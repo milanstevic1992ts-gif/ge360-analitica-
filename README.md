@@ -26,7 +26,7 @@ Esempi:
 - API-first
 - dashboard veloce e leggibile
 - niente dipendenza da servizi SaaS per visualizzare i dati
-- agente principale via Codex CLI autenticato con ChatGPT, senza OpenAI API key nel progetto
+- integrazione con ChatGPT tramite plugin/app MCP: GE360 espone strumenti, ChatGPT resta la chat e il motore intelligente
 
 ## Avvio rapido
 
@@ -53,10 +53,10 @@ API docs: http://localhost:8787/docs
 | Search Console | scaffolding |
 | Funnel e attribuzione | MVP |
 | Alert / insight | MVP |
-| ChatGPT / Codex CLI Agent Bridge | MVP |
+| ChatGPT / GE360 MCP Plugin | MVP |
 
 ## Ispirazione progettuale
 
 Il progetto prende spunti architetturali e UX da Plausible, PostHog, Mixpost, Metabase, Apache Superset e Matomo, ma l'implementazione di GE360 Analitica è originale e mirata a una singola attività locale.
 
-Vedi [docs/INSPIRATION.md](docs/INSPIRATION.md), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) e [docs/AGENT_BRIDGE.md](docs/AGENT_BRIDGE.md).
+Vedi [docs/INSPIRATION.md](docs/INSPIRATION.md), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) e [docs/CHATGPT_MCP.md](docs/CHATGPT_MCP.md).
