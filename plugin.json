@@ -23,8 +23,8 @@
         "shortDescription": "Interroga i tuoi dati marketing direttamente in ChatGPT.",
         "longDescription": "GE360 Analitica rende disponibili a ChatGPT metriche, eventi, lead aggregati e stato dei connettori tramite MCP read-only.",
         "developerName": "GE360",
-        "category": "productivity",
-        "capabilities": ["tools"],
+        "category": "Productivity",
+        "capabilities": ["Read"],
         "defaultPrompt": [
           "Analizza i dati GE360 degli ultimi 30 giorni.",
           "Quali sorgenti stanno portando più lead?",
