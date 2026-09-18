@@ -3,12 +3,12 @@
   "mcpServers": {
     "ge360": {
       "type": "stdio",
-      "command": "./.venv/bin/python",
+      "command": "bash",
       "args": [
-        "${PLUGIN_ROOT}/mcp_server/server.py"
+        "${PLUGIN_ROOT}/scripts/run-mcp.sh"
       ],
       "env": {
-        "GE360_MCP_DB_PATH": "${PLUGIN_ROOT}/data/ge360.db"
+        "GE360_API_BASE": "http://127.0.0.1:8787"
       },
       "cwd": "${PLUGIN_ROOT}"
     }
