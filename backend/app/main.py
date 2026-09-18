@@ -9,7 +9,7 @@ from .background import auto_sync_enabled, periodic_sync
 from .connectors.registry import diagnostics
 from .connectors.wordpress import WordPressConnector
 from .db import connector_states, initialize
-from .demo_data import dashboard
+from .dashboard_service import dashboard
 from .sync import sync_all, sync_provider
 
 app = FastAPI(
