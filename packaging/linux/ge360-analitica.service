@@ -1,0 +1,27 @@
+[Unit]
+Description=GE360 Analitica
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ge360
+Group=ge360
+EnvironmentFile=-/etc/ge360-analitica/ge360.env
+Environment=GE360_FRONTEND_DIR=/opt/ge360-analitica/www
+Environment=TMPDIR=/var/lib/ge360-analitica/tmp
+WorkingDirectory=/var/lib/ge360-analitica
+ExecStart=/usr/bin/ge360-analitica serve --host 127.0.0.1 --port 8788
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=20
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/ge360-analitica
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target
