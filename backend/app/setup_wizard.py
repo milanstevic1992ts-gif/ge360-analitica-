@@ -36,6 +36,7 @@ class MetaCredentialsRequest(BaseModel):
     app_secret: str = Field(default="", max_length=500)
     graph_version: str = Field(default="v26.0", max_length=20)
     redirect_uri: str = Field(default="", max_length=500)
+    business_login_config_id: str = Field(default="", max_length=300)
 
 
 class MetaSetupRequest(BaseModel):
@@ -115,6 +116,7 @@ async def status() -> dict[str, Any]:
                 "META_PAGE_ACCESS_TOKEN",
                 "META_INSTAGRAM_ACCOUNT_ID",
                 "META_GRAPH_VERSION",
+                "META_BUSINESS_LOGIN_CONFIG_ID",
                 "META_USER_ACCESS_TOKEN",
                 "META_USER_ID",
                 "META_USER_NAME",
@@ -321,6 +323,8 @@ def save_meta_credentials(request: MetaCredentialsRequest) -> dict[str, Any]:
     }
     if request.app_secret:
         values["META_APP_SECRET"] = request.app_secret
+    if request.business_login_config_id:
+        values["META_BUSINESS_LOGIN_CONFIG_ID"] = request.business_login_config_id.strip()
 
     if request.redirect_uri:
         redirect = request.redirect_uri.strip()
@@ -334,22 +338,32 @@ def save_meta_credentials(request: MetaCredentialsRequest) -> dict[str, Any]:
 
     set_many(values)
     oauth_ready = bool(get("META_APP_ID") and get("META_APP_SECRET"))
+    business_login_ready = bool(get("META_BUSINESS_LOGIN_CONFIG_ID"))
     return {
         "ok": True,
         "sdk_ready": bool(get("META_APP_ID")),
         "oauth_ready": oauth_ready,
-        "login_mode": "server_oauth" if oauth_ready else "javascript_sdk",
+        "business_login_ready": business_login_ready,
+        "login_mode": (
+            "facebook_login_for_business"
+            if oauth_ready and business_login_ready
+            else ("server_oauth" if oauth_ready else "javascript_sdk")
+        ),
         "redirect_uri": get(
             "META_REDIRECT_URI",
             "http://127.0.0.1:8788/api/oauth/meta/callback",
         ),
         "message": (
-            "Meta OAuth server pronto. Ora premi Accedi con Facebook."
-            if oauth_ready
+            "Facebook Login for Business pronto. Ora premi Accedi con Facebook."
+            if oauth_ready and business_login_ready
             else (
-                "Meta App ID salvato. Login JavaScript disponibile."
-                if get("META_APP_ID")
-                else "Inserisci il Meta App ID."
+                "Meta OAuth server salvato: aggiungi la Configuration ID di Facebook Login for Business."
+                if oauth_ready
+                else (
+                    "Meta App ID salvato. Login JavaScript disponibile."
+                    if get("META_APP_ID")
+                    else "Inserisci il Meta App ID."
+                )
             )
         ),
     }
