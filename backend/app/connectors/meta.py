@@ -15,6 +15,34 @@ CANDIDATE_PAGE_METRICS = [
     "page_post_engagements",
     "page_follows",
     "page_views_total",
+    "page_impressions",
+    "page_impressions_unique",
+    "page_engaged_users",
+    "page_actions_post_reactions_total",
+    "page_video_views",
+    "page_fans",
+]
+
+CANDIDATE_IG_ACCOUNT_METRICS = [
+    "reach",
+    "views",
+    "accounts_engaged",
+    "total_interactions",
+    "profile_views",
+    "website_clicks",
+    "follows_and_unfollows",
+]
+
+CANDIDATE_IG_MEDIA_METRICS = [
+    "reach",
+    "views",
+    "impressions",
+    "total_interactions",
+    "likes",
+    "comments",
+    "shares",
+    "saved",
+    "plays",
 ]
 
 
@@ -169,6 +197,103 @@ class MetaConnector(Connector):
 
         return items
 
+    async def _instagram_account_insights(
+        self,
+        client: httpx.AsyncClient,
+        ig_id: str,
+        since: int,
+        until: int,
+    ) -> tuple[list[dict[str, Any]], dict[str, str]]:
+        metrics: list[dict[str, Any]] = []
+        skipped: dict[str, str] = {}
+
+        for metric in CANDIDATE_IG_ACCOUNT_METRICS:
+            response = await client.get(
+                f"{self.graph_base}/{ig_id}/insights",
+                params={
+                    "metric": metric,
+                    "period": "day",
+                    "since": since,
+                    "until": until,
+                    "access_token": self.access_token,
+                },
+            )
+            if response.status_code >= 400:
+                try:
+                    skipped[metric] = response.json().get("error", {}).get("message", "") or f"HTTP {response.status_code}"
+                except Exception:
+                    skipped[metric] = f"HTTP {response.status_code}"
+                continue
+
+            payload = response.json()
+            for series in payload.get("data", []):
+                name = series.get("name") or metric
+                for item in series.get("values", []):
+                    value = item.get("value")
+                    if isinstance(value, dict):
+                        continue
+                    try:
+                        numeric = float(value or 0)
+                    except (TypeError, ValueError):
+                        continue
+                    metrics.append(
+                        {
+                            "metric": f"instagram_{name}",
+                            "value": numeric,
+                            "dimension": "account",
+                            "dimension_value": ig_id,
+                            "captured_at": item.get("end_time") or datetime.now(timezone.utc).isoformat(),
+                        }
+                    )
+
+        return metrics, skipped
+
+    async def _instagram_media_insights(
+        self,
+        client: httpx.AsyncClient,
+        media_id: str,
+        captured_at: str,
+    ) -> tuple[list[dict[str, Any]], dict[str, str]]:
+        metrics: list[dict[str, Any]] = []
+        skipped: dict[str, str] = {}
+
+        for metric in CANDIDATE_IG_MEDIA_METRICS:
+            response = await client.get(
+                f"{self.graph_base}/{media_id}/insights",
+                params={"metric": metric, "access_token": self.access_token},
+            )
+            if response.status_code >= 400:
+                try:
+                    skipped[metric] = response.json().get("error", {}).get("message", "") or f"HTTP {response.status_code}"
+                except Exception:
+                    skipped[metric] = f"HTTP {response.status_code}"
+                continue
+
+            payload = response.json()
+            for series in payload.get("data", []):
+                name = series.get("name") or metric
+                values = series.get("values") or []
+                if not values:
+                    continue
+                raw = values[-1].get("value")
+                if isinstance(raw, dict):
+                    continue
+                try:
+                    numeric = float(raw or 0)
+                except (TypeError, ValueError):
+                    continue
+                metrics.append(
+                    {
+                        "metric": f"instagram_media_{name}",
+                        "value": numeric,
+                        "dimension": "media_id",
+                        "dimension_value": media_id,
+                        "captured_at": captured_at,
+                    }
+                )
+
+        return metrics, skipped
+
     async def _instagram_profile_and_media(
         self,
         client: httpx.AsyncClient,
@@ -237,17 +362,44 @@ class MetaConnector(Connector):
                     if product == "reels"
                     else f"instagram_{media_type or 'media'}"
                 )
+                media_id = str(media.get("id") or "")
+                timestamp = media.get("timestamp") or captured_at
                 content_items.append(
                     {
-                        "external_id": f"ig:{media.get('id')}",
+                        "external_id": f"ig:{media_id}",
                         "content_type": content_type,
                         "title": caption[:140] if caption else "Contenuto Instagram",
                         "url": media.get("permalink"),
                         "status": "published",
-                        "published_at": media.get("timestamp"),
-                        "modified_at": media.get("timestamp"),
+                        "published_at": timestamp,
+                        "modified_at": timestamp,
                     }
                 )
+                for metric_name, metric_value in (
+                    ("instagram_media_like_count", media.get("like_count")),
+                    ("instagram_media_comments_count", media.get("comments_count")),
+                ):
+                    if metric_value is not None:
+                        try:
+                            metrics.append(
+                                {
+                                    "metric": metric_name,
+                                    "value": float(metric_value or 0),
+                                    "dimension": "media_id",
+                                    "dimension_value": media_id,
+                                    "captured_at": timestamp,
+                                }
+                            )
+                        except (TypeError, ValueError):
+                            pass
+
+                if media_id:
+                    insight_metrics, _ = await self._instagram_media_insights(
+                        client,
+                        media_id,
+                        timestamp,
+                    )
+                    metrics.extend(insight_metrics)
 
             next_url = payload.get("paging", {}).get("next")
             if not next_url:
@@ -294,6 +446,16 @@ class MetaConnector(Connector):
 
             try:
                 ig_metrics, ig_content, ig_note = await self._instagram_profile_and_media(client)
+                if self.instagram_account_id:
+                    ig_account_metrics, ig_skipped = await self._instagram_account_insights(
+                        client,
+                        self.instagram_account_id,
+                        since,
+                        until,
+                    )
+                    ig_metrics.extend(ig_account_metrics)
+                    if ig_skipped:
+                        ig_note += f"; {len(ig_skipped)} metriche account non disponibili"
             except Exception as exc:
                 ig_metrics, ig_content = [], []
                 ig_note = f"Instagram non sincronizzato: {exc}"
