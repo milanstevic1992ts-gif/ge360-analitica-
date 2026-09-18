@@ -7,6 +7,7 @@ from typing import Any
 import httpx
 
 from .base import Connector, ConnectorResult
+from ..config_store import get as config_get
 
 
 _TAG_RE = re.compile(r"<[^>]+>")
@@ -34,10 +35,10 @@ class WordPressConnector(Connector):
     provider = "wordpress"
 
     def __init__(self) -> None:
-        self.base_url = os.getenv("WORDPRESS_BASE_URL", "").rstrip("/")
-        self.username = os.getenv("WORDPRESS_USERNAME", "")
-        self.app_password = os.getenv("WORDPRESS_APP_PASSWORD", "")
-        self.ge360_key = os.getenv("WORDPRESS_GE360_KEY", "")
+        self.base_url = config_get("WORDPRESS_BASE_URL").rstrip("/")
+        self.username = config_get("WORDPRESS_USERNAME")
+        self.app_password = config_get("WORDPRESS_APP_PASSWORD")
+        self.ge360_key = config_get("WORDPRESS_GE360_KEY")
 
     def configured(self) -> bool:
         return bool(self.base_url)
