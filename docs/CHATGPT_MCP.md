@@ -1,16 +1,16 @@
 # ChatGPT + GE360 Analitica
 
-## Obiettivo
+## Architettura
 
 GE360 non incorpora un modello e non usa una OpenAI API key.
 
-L'intelligenza resta in **ChatGPT**. GE360 espone invece strumenti read-only tramite Model Context Protocol (MCP).
+L'intelligenza resta nella normale conversazione **ChatGPT**. Il plugin GE360 espone strumenti read-only tramite MCP e interroga la API locale del gestionale.
 
 ```
 Utente
   |
   v
-ChatGPT (Chat / Work)
+ChatGPT Desktop
   |
   | plugin GE360 Analitica
   v
@@ -19,99 +19,91 @@ MCP stdio locale
   v
 mcp_server/server.py
   |
+  | HTTP solo localhost
   v
-data/ge360.db (read-only)
+http://127.0.0.1:8787
+  |
+  v
+GE360 API -> SQLite
 ```
 
-## Esperienza utente
+Questa separazione è intenzionale: la copia del plugin installata da ChatGPT può vivere nella propria cache, mentre i dati rimangono nel gestionale GE360 in esecuzione.
 
-L'uso previsto è la normale conversazione ChatGPT.
+## Esperienza
 
-Esempi:
+Esempi di richieste:
 
 - "Analizza GE360 negli ultimi 30 giorni."
 - "Quale sorgente mi sta portando più lead?"
 - "Confronta questa settimana con la precedente."
-- "Ci sono anomalie?"
-- "Quali dati mancano per capire meglio le conversioni?"
+- "Trova pagine visitate che non stanno convertendo."
+- "Ci sono anomalie negli ultimi 7 giorni?"
+- "Come stanno andando le query locali con Trieste?"
 
-ChatGPT decide quali strumenti GE360 chiamare e poi risponde nella conversazione.
+ChatGPT sceglie gli strumenti GE360 necessari e risponde nella conversazione.
 
-## Perché questa architettura
+## Strumenti MCP
 
-- nessuna OpenAI API key nel progetto;
-- nessun clone della UI ChatGPT;
-- nessun modello locale obbligatorio;
-- nessun Codex CLI;
-- il modello e la conversazione restano quelli selezionati in ChatGPT;
-- GE360 rimane un sistema analytics indipendente;
-- l'integrazione è read-only per progettazione.
+- `ge360_status`: quantità dati, aggiornamenti e connettori.
+- `ge360_metrics`: metriche normalizzate.
+- `ge360_events_summary`: eventi per tipo e sorgente.
+- `ge360_leads_summary`: lead aggregati.
+- `ge360_recent_leads`: soli campi analitici, nessun payload personale.
+- `ge360_compare_periods`: confronto deterministico fra periodi.
+- `ge360_opportunity_radar`: traffico alto con conversione debole.
+- `ge360_content_performance`: pagina -> azioni -> lead.
+- `ge360_anomalies`: variazioni rilevanti rispetto al periodo precedente.
+- `ge360_local_seo`: query Search Console che contengono località/parole specifiche.
 
-## Strumenti MCP iniziali
+Tutti gli strumenti sono dichiarati read-only.
 
-### ge360_status
-Stato del database e dei connettori.
-
-### ge360_metrics
-Metriche normalizzate per provider, nome e periodo.
-
-### ge360_events_summary
-Eventi aggregati per tipo e sorgente.
-
-### ge360_leads_summary
-Lead aggregati per canale e sorgente.
-
-### ge360_recent_leads
-Campi esclusivamente analitici dei lead recenti. Nessun payload grezzo.
-
-### ge360_compare_periods
-Confronta una metrica tra periodo corrente e precedente.
-
-## Preparazione locale
+## Preparazione Linux
 
 Dalla root del repository:
 
 ```bash
 chmod +x scripts/setup-chatgpt-plugin.sh
 ./scripts/setup-chatgpt-plugin.sh
+docker compose up -d --build
 ```
 
-Lo script crea `.venv` e installa l'SDK MCP.
+Lo script crea l'ambiente MCP in:
+
+```
+~/.local/share/ge360-analitica/mcp-venv
+```
+
+L'ambiente è esterno alla cache del plugin ChatGPT, quindi una reinstallazione del plugin non lo distrugge.
+
+## Rete
+
+Docker pubblica:
+
+- API: `127.0.0.1:8787`
+- dashboard: `127.0.0.1:8788`
+
+Non vengono aperte porte su tutte le interfacce di rete.
 
 ## Plugin
 
 La root contiene:
 
-- `plugin.json`: identità del plugin;
+- `plugin.json`: identità e presentazione;
 - `mcp.json`: server MCP stdio;
-- `skills/ge360-analitica/SKILL.md`: istruzioni analitiche;
-- `mcp_server/server.py`: strumenti read-only.
+- `scripts/run-mcp.sh`: launcher stabile;
+- `skills/ge360-analitica/SKILL.md`: strategia di analisi;
+- `mcp_server/server.py`: strumenti ChatGPT.
 
-Il plugin locale MCP è pensato per ChatGPT Desktop. La disponibilità dell'importazione locale e del Developer Mode dipende dal piano/account e dalla versione di ChatGPT.
+## Sicurezza e privacy
 
-## Sicurezza
+Il plugin:
 
-Il database viene aperto con SQLite `mode=ro`.
+- non riceve token OAuth dei connettori;
+- non espone password;
+- non offre tool di scrittura;
+- non restituisce `payload_json` dei lead;
+- usa la API GE360 locale;
+- lascia le formule statistiche deterministiche nel backend;
+- lascia a ChatGPT la spiegazione e il ragionamento sui risultati.
 
-Il server non espone strumenti per:
-
-- modificare lead;
-- cambiare metriche;
-- scrivere nel database;
-- leggere password;
-- leggere token OAuth;
-- eseguire comandi arbitrari.
-
-Le credenziali dei connettori rimangono fuori dagli strumenti MCP.
-
-## Futuro
-
-Quando il database reale sarà popolato, possiamo aggiungere:
-
-- `ge360_opportunity_radar`
-- `ge360_local_seo_summary`
-- `ge360_content_performance`
-- `ge360_anomalies`
-- `ge360_attribution_paths`
-
-La logica statistica deterministica rimane in GE360; ChatGPT interpreta e spiega i risultati.
+La disponibilità dell'importazione di plugin locali, Developer Mode e delle superfici desktop dipende dal piano/account e dalla versione di ChatGPT.
