@@ -370,15 +370,16 @@ def local_seo(days: int = 30, contains: str = "trieste", limit: int = 50) -> lis
         rows = conn.execute(
             """
             SELECT
+                provider,
                 dimension_value AS query,
                 metric,
                 SUM(value) AS value
             FROM metric_snapshots
             WHERE captured_at >= ?
-              AND provider = 'search_console'
+              AND provider IN ('search_console', 'google_business')
               AND LOWER(COALESCE(dimension, '')) = 'query'
               AND LOWER(COALESCE(dimension_value, '')) LIKE ?
-            GROUP BY dimension_value, metric
+            GROUP BY provider, dimension_value, metric
             ORDER BY value DESC
             LIMIT ?
             """,
