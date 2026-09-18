@@ -5,81 +5,87 @@
 - [x] FastAPI
 - [x] SQLite
 - [x] dashboard React responsive
-- [x] dataset demo
-- [x] modello metriche / eventi / lead
+- [x] fallback demo
+- [x] dashboard live
+- [x] modello metriche / eventi / lead / contenuti
 - [x] stato connettori
+- [x] deduplica dati storici
+- [x] sincronizzazione incrementale
 
 ## Fase 1 — WordPress + lead tracking
-- [ ] collegamento WordPress REST API
-- [ ] inventario pagine/articoli
-- [ ] endpoint tracking leggero GE360
-- [ ] click WhatsApp
-- [ ] click telefono
-- [ ] invio richiesta preventivo
-- [ ] UTM / referrer
-- [ ] landing page iniziale
+- [x] connettore WordPress REST API
+- [x] inventario pagine/articoli
+- [x] plugin GE360 Tracker
+- [x] page view
+- [x] click WhatsApp
+- [x] click telefono
+- [x] invio moduli
+- [x] UTM / referrer
+- [x] attribuzione landing page
+- [x] endpoint REST protetto per sync
+- [x] cursore incrementale / deduplica
+- [x] ZIP installabile via GitHub Actions
+- [ ] installazione tracker sul sito reale
+- [ ] verifica eventi reali raccolti
 
 ## Fase 2 — Google
-- [ ] OAuth Google
-- [ ] Google Analytics 4
-- [ ] Search Console
-- [ ] Google Business Profile
-- [ ] recensioni
-- [ ] chiamate / click sito / indicazioni quando disponibili via API
-- [ ] query SEO locale
+- [x] OAuth Google lato GE360
+- [x] salvataggio refresh token locale
+- [x] Google Analytics 4 Data API
+- [x] Search Console API
+- [x] Google Business Profile Performance API
+- [x] chiamate / click sito / indicazioni / impression Business Profile
+- [x] keyword mensili Google Business
+- [x] query SEO locale
+- [ ] creare/configurare credenziali OAuth Google reali
+- [ ] collegare property GA4
+- [ ] collegare property Search Console
+- [ ] collegare location Google Business
+- [ ] valutare recensioni Google in modulo separato
 
 ## Fase 3 — Meta
-- [ ] OAuth Meta
-- [ ] Facebook Page
-- [ ] contenuti e performance
-- [ ] Reel / post
-- [ ] engagement
-- [ ] traffico verso il sito
-- [ ] gestione graceful delle metriche non più disponibili
+- [x] connettore Facebook Page
+- [x] Graph API versionata
+- [x] Page Insights resilienti a metriche rimosse
+- [x] catalogo post Facebook
+- [x] gestione graceful metriche non disponibili
+- [ ] OAuth Meta guidato
+- [ ] collegare Page ID e Page access token reali
+- [ ] post-level performance / Reel
+- [ ] Instagram Professional se collegato
 
-## Fase 4 — Intelligence
-
-### Opportunity Radar
-Trova pagine o contenuti con:
-- tanto traffico ma pochi lead
-- tante impression ma CTR basso
-- crescita rapida
-- calo improvviso
-
-### Anomaly Watch
-Confronta oggi / 7 giorni / 30 giorni e segnala variazioni insolite.
-
-### Content Pulse
-Unifica pagina WordPress + post/reel social + traffico + lead prodotti.
-
-### Local SEO Radar
-Monitora query che contengono Trieste, quartieri, servizi e intenzioni commerciali.
-
-### Lead attribution
-Percorso:
-```
-source -> campaign/content -> landing page -> action -> lead
-```
+## Fase 4 — Intelligence deterministica
+- [x] Opportunity Radar
+- [x] Anomaly Watch
+- [x] Content Performance
+- [x] Local SEO Radar
+- [x] Lead attribution
+- [x] confronti fra periodi
+- [x] KPI live
+- [x] insight dashboard basati sui dati
+- [ ] scoring opportunità più evoluto
+- [ ] attribuzione multi-touch
 
 ## Fase 5 — ChatGPT come interfaccia intelligente
 - [x] architettura MCP read-only
 - [x] GE360 come fonte dati/tool per ChatGPT
-- [ ] plugin/app GE360 Analitica in ChatGPT
-- [ ] strumenti summary / sorgenti / contenuti / lead / connettori
-- [ ] briefing automatico
-- [ ] domande in linguaggio naturale
-- [ ] "cosa è migliorato?"
-- [ ] "cosa è peggiorato?"
-- [ ] "quale contenuto dovrei rifare?"
-- [ ] spiegazione basata sempre sui dati e non su supposizioni
-- [ ] conversazioni gestite direttamente in ChatGPT
-- [ ] eventuale fallback locale solo se utile
+- [x] plugin GE360 Analitica
+- [x] manifesti plugin/MCP validati in CI
+- [x] skill GE360
+- [x] strumenti status / metriche / lead / contenuti / anomalie / SEO
+- [x] marketplace locale repository
+- [ ] installazione effettiva nel ChatGPT Desktop dell'host Linux
+- [ ] test conversazioni su dati reali
+- [ ] briefing automatici basati su GE360
 
 ## Fase 6 — Operatività
-- [ ] scheduler sync
-- [ ] backup
+- [x] scheduler sync automatico
+- [x] sync manuale da dashboard
+- [x] porte API/dashboard limitate a localhost
+- [x] CI backend/frontend/MCP/plugin/WordPress
+- [ ] backup automatico SQLite + secrets
 - [ ] audit log
 - [ ] export CSV
 - [ ] export PDF report
 - [ ] notifiche
-- [ ] health dashboard
+- [ ] health dashboard avanzata
