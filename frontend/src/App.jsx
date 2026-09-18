@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import LocalAIPage from './LocalAIPage'
+import SetupWizardPage from './SetupWizardPage'
 import {
   Activity,
   BarChart3,
@@ -17,6 +18,7 @@ import {
   MessageCircle,
   RefreshCw,
   Search,
+  Settings2,
   Share2,
   Sparkles,
   Target,
@@ -45,6 +47,7 @@ const periods = [
 
 const nav = [
   { id: 'overview', label: 'Panoramica', icon: LayoutDashboard },
+  { id: 'setup', label: 'Configurazione', icon: Settings2 },
   { id: 'acquisition', label: 'Acquisizione', icon: TrendingUp },
   { id: 'content', label: 'Contenuti', icon: BarChart3 },
   { id: 'leads', label: 'Lead', icon: Target },
@@ -60,7 +63,11 @@ const formatMoney = (value) =>
   new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(value || 0)
 
 function App() {
-  const [activeView, setActiveView] = useState('overview')
+  const [activeView, setActiveView] = useState(() => {
+    const googleReturned = new URLSearchParams(window.location.search).get('google') === 'connected'
+    if (googleReturned) return 'setup'
+    return localStorage.getItem('ge360-setup-seen') ? 'overview' : 'setup'
+  })
   const [period, setPeriod] = useState('30d')
   const [data, setData] = useState(null)
   const [connectors, setConnectors] = useState([])
@@ -257,7 +264,7 @@ function App() {
           </div>
         </header>
 
-        {activeView !== 'local-ai' && activeView !== 'connectors' && (
+        {activeView !== 'local-ai' && activeView !== 'connectors' && activeView !== 'setup' && (
           <PeriodBar period={period} setPeriod={setPeriod} />
         )}
 
@@ -292,6 +299,7 @@ function App() {
             actionMessage={actionMessage}
           />
         )}
+        {activeView === 'setup' && <SetupWizardPage onFinish={() => navigate('overview')} />}
         {activeView === 'local-ai' && <LocalAIPage days={days} dashboardMode={data?.mode} />}
       </main>
     </div>
