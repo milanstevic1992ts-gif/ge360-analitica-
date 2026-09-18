@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-VERSION="${GE360_VERSION:-0.6.3}"
+VERSION="${GE360_VERSION:-0.6.4}"
 ARCH="${GE360_ARCH:-amd64}"
 DIST="$ROOT/dist"
 PKG="$DIST/pkgroot"
