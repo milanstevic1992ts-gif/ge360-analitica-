@@ -17,7 +17,7 @@ from .sync import sync_all, sync_provider
 
 app = FastAPI(
     title="GE360 Analitica API",
-    version="0.6.1",
+    version="0.6.2",
     description="API centrale per analytics, attribuzione e connettori GE360.",
 )
 
@@ -55,7 +55,7 @@ async def shutdown() -> None:
 
 @app.get("/api/health")
 def health() -> dict:
-    return {"status": "ok", "service": "ge360-analitica", "version": "0.6.1"}
+    return {"status": "ok", "service": "ge360-analitica", "version": "0.6.2"}
 
 
 @app.get("/api/dashboard")
