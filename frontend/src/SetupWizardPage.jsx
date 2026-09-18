@@ -31,6 +31,66 @@ const steps = [
   { id: 'finish', label: 'Verifica finale', icon: CheckCircle2 },
 ]
 
+const META_SCOPES = [
+  'pages_show_list',
+  'pages_read_engagement',
+  'read_insights',
+  'instagram_basic',
+  'instagram_manage_insights',
+].join(',')
+
+let facebookSdkPromise
+
+function loadFacebookSdkLibrary() {
+  if (window.FB) return Promise.resolve(window.FB)
+  if (facebookSdkPromise) return facebookSdkPromise
+
+  facebookSdkPromise = new Promise((resolve, reject) => {
+    const existing = document.getElementById('facebook-jssdk')
+    if (existing) {
+      const started = Date.now()
+      const timer = window.setInterval(() => {
+        if (window.FB) {
+          window.clearInterval(timer)
+          resolve(window.FB)
+        } else if (Date.now() - started > 10000) {
+          window.clearInterval(timer)
+          reject(new Error('Facebook SDK non disponibile'))
+        }
+      }, 100)
+      return
+    }
+
+    const script = document.createElement('script')
+    script.id = 'facebook-jssdk'
+    script.async = true
+    script.defer = true
+    script.crossOrigin = 'anonymous'
+    script.src = 'https://connect.facebook.net/it_IT/sdk.js'
+    script.onload = () => {
+      if (window.FB) resolve(window.FB)
+      else reject(new Error('Facebook SDK caricato ma non inizializzato'))
+    }
+    script.onerror = () => reject(new Error('Impossibile caricare Facebook SDK'))
+    document.body.appendChild(script)
+  })
+
+  return facebookSdkPromise
+}
+
+function initFacebookSdk(FB, appId, version) {
+  if (!appId) throw new Error('Inserisci prima il Meta App ID')
+  if (window.__GE360_FB_APP_ID !== appId) {
+    FB.init({
+      appId,
+      cookie: true,
+      xfbml: false,
+      version: version || 'v26.0',
+    })
+    window.__GE360_FB_APP_ID = appId
+  }
+}
+
 function SetupWizardPage({ onFinish }) {
   const params = new URLSearchParams(window.location.search)
   const [step, setStep] = useState(() => {
@@ -169,8 +229,28 @@ function SetupWizardPage({ onFinish }) {
   }
 
   useEffect(() => {
+    loadFacebookSdkLibrary().catch(() => {})
+
     const initialize = async () => {
       await loadStatus()
+
+      const origin = window.location.origin
+      const isTailscaleHttps =
+        window.location.protocol === 'https:' && window.location.hostname.endsWith('.ts.net')
+
+      if (isTailscaleHttps) {
+        try {
+          await fetch('/api/setup/system/public-origin', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ origin }),
+          })
+          await loadStatus()
+        } catch {
+          // Il login Facebook può comunque essere configurato manualmente.
+        }
+      }
+
       if (params.get('google') === 'connected') {
         await discoverGoogle({ silent: true })
       }
@@ -192,6 +272,30 @@ function SetupWizardPage({ onFinish }) {
     meta: Boolean(status?.completion?.meta),
     finish: progress >= 80,
   }), [status, progress])
+
+  const savePublicOrigin = async () => {
+    setBusy('public-origin')
+    setMessage('')
+    try {
+      const response = await fetch('/api/setup/system/public-origin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ origin: window.location.origin }),
+      })
+      const payload = await response.json()
+      if (!response.ok) throw new Error(payload.detail || 'Indirizzo pubblico non salvato')
+      setMessage(
+        payload.is_https
+          ? `Tailscale / HTTPS registrato: ${payload.origin}`
+          : `Indirizzo locale registrato: ${payload.origin}. Per Meta usa GE360 via HTTPS Tailscale.`
+      )
+      await loadStatus()
+    } catch (error) {
+      setMessage(error.message)
+    } finally {
+      setBusy('')
+    }
+  }
 
   const saveAI = async () => {
     setBusy('ai')
@@ -317,9 +421,9 @@ function SetupWizardPage({ onFinish }) {
       const payload = await response.json()
       if (!response.ok) throw new Error(payload.detail || 'Configurazione Meta non salvata')
       setMessage(
-        payload.oauth_ready
-          ? 'Configurazione Meta pronta. Ora premi Accedi con Facebook.'
-          : 'Servono App ID e App Secret.'
+        payload.sdk_ready
+          ? 'Meta App ID salvato. Ora premi Accedi con Facebook.'
+          : 'Inserisci il Meta App ID.'
       )
       await loadStatus()
     } catch (error) {
@@ -330,17 +434,68 @@ function SetupWizardPage({ onFinish }) {
   }
 
   const connectMeta = async () => {
-    setBusy('meta-login')
     setMessage('')
+
+    const appId = status?.meta?.META_APP_ID?.value || meta.app_id
+    if (!appId) {
+      setMessage('Inserisci e salva prima il Meta App ID.')
+      return
+    }
+
+    if (window.location.protocol !== 'https:' && !['127.0.0.1', 'localhost'].includes(window.location.hostname)) {
+      setMessage('Apri GE360 tramite il tuo indirizzo HTTPS Tailscale prima di accedere con Facebook.')
+      return
+    }
+
+    setBusy('meta-login')
     try {
-      const response = await fetch('/api/oauth/meta/start')
-      const payload = await response.json()
-      if (!response.ok) throw new Error(payload.detail || 'Facebook Login non ancora configurato')
-      window.location.href = payload.authorization_url
-    } catch (error) {
-      setMessage(
-        `${error.message}. Apri "Configurazione una tantum" e inserisci App ID/Secret.`
+      const FB = await loadFacebookSdkLibrary()
+      initFacebookSdk(FB, appId, meta.graph_version || 'v26.0')
+
+      FB.login(
+        async (response) => {
+          try {
+            const auth = response?.authResponse
+            if (!auth?.accessToken) {
+              setMessage('Accesso Facebook annullato o non autorizzato.')
+              return
+            }
+
+            const sessionResponse = await fetch('/api/oauth/meta/session', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                access_token: auth.accessToken,
+                user_id: auth.userID || '',
+                expires_in: auth.expiresIn || null,
+                data_access_expiration_time: auth.data_access_expiration_time || null,
+              }),
+            })
+            const payload = await sessionResponse.json()
+            if (!sessionResponse.ok) {
+              throw new Error(payload.detail || 'Login Facebook non riuscito')
+            }
+
+            setMetaPages(payload.pages || [])
+            setMessage(
+              payload.pages?.length
+                ? `Accesso riuscito come ${payload.profile?.name || 'profilo Facebook'}. Ora scegli la Pagina.`
+                : `Accesso riuscito come ${payload.profile?.name || 'profilo Facebook'}, ma non risultano Pagine disponibili.`
+            )
+            await loadStatus()
+          } catch (error) {
+            setMessage(error.message)
+          } finally {
+            setBusy('')
+          }
+        },
+        {
+          scope: META_SCOPES,
+          return_scopes: true,
+        }
       )
+    } catch (error) {
+      setMessage(error.message)
       setBusy('')
     }
   }
@@ -435,7 +590,7 @@ function SetupWizardPage({ onFinish }) {
             <div><span>PASSAGGIO {step + 1} DI {steps.length}</span><h3>{current.label}</h3></div>
           </div>
 
-          {step === 0 && <SystemStep status={status} reload={loadStatus} busy={busy} />}
+          {step === 0 && <SystemStep status={status} reload={loadStatus} busy={busy} savePublicOrigin={savePublicOrigin} />}
 
           {step === 1 && (
             <section className="wizard-form">
@@ -625,50 +780,54 @@ function SetupWizardPage({ onFinish }) {
           {step === 4 && (
             <section className="wizard-form">
               <GuideText
-                title="Facebook e Instagram: un solo login"
-                text="Fai accesso con Facebook. GE360 legge le Pagine che amministri e prova a trovare l'Instagram professionale collegato."
+                title="Facebook e Instagram: accedi e scegli"
+                text="Serve solo il Meta App ID. Il login avviene nella finestra ufficiale Facebook; GE360 poi mostra profilo, Pagine e Instagram professionale collegato."
               />
 
-              <div className={status?.completion?.meta ? 'login-card connected' : 'login-card'}>
+              <div className={status?.meta?.META_USER_ACCESS_TOKEN?.configured ? 'login-card connected' : 'login-card'}>
                 <div className="login-card-icon"><Share2 size={24} /></div>
                 <div>
-                  <strong>{status?.completion?.meta ? 'Facebook / Instagram collegati' : 'Accedi con Facebook'}</strong>
+                  <strong>{status?.meta?.META_USER_ACCESS_TOKEN?.configured ? 'Facebook autorizzato' : 'Accedi con Facebook'}</strong>
                   <p>
-                    Niente Page ID o token da copiare: dopo il login scegli la Pagina da un elenco.
+                    {status?.meta?.META_USER_ACCESS_TOKEN?.configured
+                      ? `Profilo: ${status?.meta?.META_USER_NAME?.value || 'collegato'}`
+                      : 'Niente Page ID, token o App Secret da copiare nel percorso normale.'}
                   </p>
                 </div>
-                <button className="primary-action login-action" onClick={connectMeta} disabled={Boolean(busy)}>
-                  <LogIn size={15} /> {status?.completion?.meta ? 'Ricollega' : 'Accedi con Facebook'}
+                <button
+                  className="primary-action login-action facebook-login-action"
+                  onClick={connectMeta}
+                  disabled={Boolean(busy) || !status?.meta?.META_APP_ID?.configured}
+                >
+                  <LogIn size={15} /> {status?.meta?.META_USER_ACCESS_TOKEN?.configured ? 'Ricollega Facebook' : 'Accedi con Facebook'}
                 </button>
               </div>
 
-              {!status?.meta?.META_APP_ID?.configured || !status?.meta?.META_APP_SECRET?.configured ? (
+              {!status?.meta?.META_APP_ID?.configured ? (
                 <div className="one-time-setup">
                   <div className="one-time-heading">
                     <Settings2 size={18} />
-                    <div><strong>Prima volta: identifica GE360 a Meta</strong><span>App ID e Secret si inseriscono una volta sola.</span></div>
+                    <div>
+                      <strong>Prima volta: inserisci soltanto l'App ID</strong>
+                      <span>L'App Secret non è necessario per questo login.</span>
+                    </div>
                   </div>
                   <ol className="wizard-numbered compact">
-                    <li><strong>Apri Meta for Developers</strong><span>Crea/seleziona una app adatta alla gestione della tua Pagina.</span></li>
-                    <li><strong>Configura Facebook Login</strong><span>Aggiungi il redirect GE360 indicato sotto.</span></li>
-                    <li><strong>Copia App ID e App Secret</strong><span>Poi non dovrai più cercare Page ID o token.</span></li>
+                    <li><strong>Meta for Developers</strong><span>Apri la tua app GE360 Analitica.</span></li>
+                    <li><strong>Copia ID app</strong><span>È un identificatore pubblico, non una password.</span></li>
+                    <li><strong>Salvalo qui</strong><span>Poi userai semplicemente Accedi con Facebook.</span></li>
                   </ol>
-                  <code>http://127.0.0.1:8788/api/oauth/meta/callback</code>
+                  <div className="advanced-box-body meta-onetime-fields">
+                    <Field label="Meta App ID">
+                      <input value={meta.app_id} onChange={(e) => setMeta({ ...meta, app_id: e.target.value.trim() })} />
+                    </Field>
+                    <button className="primary-action" onClick={saveMetaCredentials} disabled={!meta.app_id || Boolean(busy)}>
+                      <Check size={14} /> Salva App ID
+                    </button>
+                  </div>
                   <a className="wizard-external-link" href="https://developers.facebook.com/apps/" target="_blank" rel="noreferrer">
                     Apri Meta for Developers <ExternalLink size={13} />
                   </a>
-                  <div className="advanced-box-body meta-onetime-fields">
-                    <Field label="Meta App ID">
-                      <input value={meta.app_id} onChange={(e) => setMeta({ ...meta, app_id: e.target.value })} />
-                    </Field>
-                    <Field
-                      label="Meta App Secret"
-                      hint={status?.meta?.META_APP_SECRET?.configured ? 'Già salvato: lascia vuoto per conservarlo.' : ''}
-                    >
-                      <input type="password" value={meta.app_secret} onChange={(e) => setMeta({ ...meta, app_secret: e.target.value })} />
-                    </Field>
-                    <button className="secondary-action" onClick={saveMetaCredentials}>Salva configurazione una tantum</button>
-                  </div>
                 </div>
               ) : (
                 <details className="advanced-box">
@@ -677,20 +836,48 @@ function SetupWizardPage({ onFinish }) {
                     <Field label="Meta App ID">
                       <input value={meta.app_id} onChange={(e) => setMeta({ ...meta, app_id: e.target.value })} />
                     </Field>
-                    <Field label="Meta App Secret">
+                    <Field
+                      label="App Secret (opzionale)"
+                      hint="Non serve per Accedi con Facebook. Usalo solo se in futuro vuoi il flusso OAuth server/long-lived."
+                    >
                       <input type="password" value={meta.app_secret} onChange={(e) => setMeta({ ...meta, app_secret: e.target.value })} />
                     </Field>
-                    <button className="secondary-action" onClick={saveMetaCredentials}>Aggiorna</button>
+                    <Field label="Graph API">
+                      <input value={meta.graph_version} onChange={(e) => setMeta({ ...meta, graph_version: e.target.value })} />
+                    </Field>
+                    <button className="secondary-action" onClick={saveMetaCredentials}>Aggiorna impostazioni Meta</button>
                   </div>
                 </details>
+              )}
+
+              {status?.meta?.META_USER_ACCESS_TOKEN?.configured && (
+                <div className="social-account-summary">
+                  <div>
+                    <span>PROFILO FACEBOOK</span>
+                    <strong>{status?.meta?.META_USER_NAME?.value || status?.meta?.META_USER_ID?.value || 'Collegato'}</strong>
+                  </div>
+                  <div>
+                    <span>PAGINA SELEZIONATA</span>
+                    <strong>{status?.meta?.META_PAGE_NAME?.value || 'Da scegliere'}</strong>
+                  </div>
+                  <div>
+                    <span>INSTAGRAM</span>
+                    <strong>
+                      {status?.meta?.META_INSTAGRAM_USERNAME?.value
+                        ? `@${status.meta.META_INSTAGRAM_USERNAME.value}`
+                        : 'Da scegliere / non rilevato'}
+                    </strong>
+                  </div>
+                </div>
               )}
 
               {metaPages.length > 0 && (
                 <>
                   <div className="wizard-divider" />
                   <div className="selection-heading">
-                    <span className="eyebrow">SCEGLI LA PAGINA</span>
-                    <h4>Quale attività vuoi collegare a GE360?</h4>
+                    <span className="eyebrow">PAGINE DISPONIBILI</span>
+                    <h4>Scegli Pagina Facebook e profilo Instagram</h4>
+                    <p>Se la Pagina ha un account Instagram Business/Creator collegato, GE360 lo associa automaticamente.</p>
                   </div>
                   <div className="page-choice-grid">
                     {metaPages.map((page) => (
@@ -705,9 +892,11 @@ function SetupWizardPage({ onFinish }) {
                           <strong>{page.name || page.id}</strong>
                           <small>{page.category || 'Pagina Facebook'}</small>
                           {page.instagram?.connected ? (
-                            <span className="instagram-found"><Camera size={12} /> @{page.instagram.username || page.instagram.id}</span>
+                            <span className="instagram-found">
+                              <Camera size={12} /> Instagram @{page.instagram.username || page.instagram.id}
+                            </span>
                           ) : (
-                            <span className="instagram-missing">Instagram non rilevato</span>
+                            <span className="instagram-missing">Nessun Instagram professionale collegato</span>
                           )}
                         </div>
                         <ArrowRight size={16} />
@@ -717,10 +906,10 @@ function SetupWizardPage({ onFinish }) {
                 </>
               )}
 
-              {(params.get('meta') === 'connected' || status?.meta?.META_USER_ACCESS_TOKEN?.configured) && (
+              {status?.meta?.META_USER_ACCESS_TOKEN?.configured && (
                 <ActionRow>
-                  <button className="secondary-action" onClick={() => loadMetaPages()}>
-                    <RefreshCw size={14} /> Rileggi le Pagine disponibili
+                  <button className="secondary-action" onClick={() => loadMetaPages()} disabled={Boolean(busy)}>
+                    <RefreshCw size={14} /> Rileggi Pagine e Instagram
                   </button>
                 </ActionRow>
               )}
@@ -783,14 +972,25 @@ function SetupWizardPage({ onFinish }) {
   )
 }
 
-function SystemStep({ status, reload, busy }) {
+function SystemStep({ status, reload, busy, savePublicOrigin }) {
+  const currentOrigin = window.location.origin
+  const savedOrigin = status?.system?.GE360_PUBLIC_ORIGIN?.value || ''
+  const tailscaleOrigin = savedOrigin || currentOrigin
+  const httpsReady = tailscaleOrigin.startsWith('https://')
+
   return (
     <section className="wizard-form">
       <GuideText
         title="GE360 controlla ciò che è già presente"
-        text="Non reinstalliamo niente. Verifichiamo AI locale e connessioni già salvate."
+        text="Non reinstalliamo niente. Verifichiamo AI locale, Tailscale/HTTPS e connessioni già salvate."
       />
       <div className="system-detect-grid">
+        <Detection
+          label="Tailscale / HTTPS"
+          value={httpsReady ? 'HTTPS pronto' : 'Apri GE360 via Tailscale'}
+          ok={httpsReady}
+          detail={tailscaleOrigin}
+        />
         <Detection label="Ollama" value={status?.ai?.ok ? 'Rilevato' : 'Non raggiungibile'} ok={status?.ai?.ok} detail={status?.ai?.base_url} />
         <Detection
           label="Modello AI"
@@ -805,6 +1005,9 @@ function SystemStep({ status, reload, busy }) {
       <ActionRow>
         <button className="secondary-action" onClick={reload} disabled={busy === 'status'}>
           <RefreshCw size={14} /> Ripeti controllo
+        </button>
+        <button className="secondary-action" onClick={savePublicOrigin} disabled={busy === 'public-origin'}>
+          <Globe2 size={14} /> Registra indirizzo corrente
         </button>
       </ActionRow>
     </section>
