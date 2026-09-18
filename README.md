@@ -1,8 +1,8 @@
-# GE360 Analitica 0.6.3
+# GE360 Analitica 0.6.4
 
 Dashboard self-hosted per WordPress, Google, Facebook/Instagram, lead, SEO locale e AI locale Ollama/Qwen.
 
-## Novità 0.6.3: elenco completo Pagine Facebook
+## Novità 0.6.4: elenco completo Pagine Facebook
 
 GE360 ora percorre automaticamente la paginazione di `/me/accounts` fino a trovare tutte le Pagine Facebook autorizzate, con un limite di sicurezza di 20 chiamate API o 1000 Pagine totali.
 
@@ -106,7 +106,7 @@ I token Meta e Google non vengono restituiti in chiaro dall'API di stato.
 Installa la nuova versione sopra quella precedente:
 
 ```bash
-sudo apt install ./ge360-analitica_0.6.3_amd64.deb
+sudo apt install ./ge360-analitica_0.6.4_amd64.deb
 ```
 
 Non disinstallare prima. Database, report e configurazione persistente vengono conservati.
