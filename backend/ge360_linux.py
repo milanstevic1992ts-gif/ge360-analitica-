@@ -5,7 +5,7 @@ import sys
 import uvicorn
 
 
-VERSION = "0.2.0"
+VERSION = "0.2.1"
 
 
 def build_parser() -> argparse.ArgumentParser:
