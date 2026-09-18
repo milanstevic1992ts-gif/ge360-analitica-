@@ -103,6 +103,7 @@ function SetupWizardPage({ onFinish }) {
   const [message, setMessage] = useState('')
   const [googleResources, setGoogleResources] = useState(null)
   const [metaPages, setMetaPages] = useState([])
+  const [metaPageQuery, setMetaPageQuery] = useState('')
   const [facebookSdkReady, setFacebookSdkReady] = useState(Boolean(window.FB))
   const [facebookSdkError, setFacebookSdkError] = useState('')
 
@@ -306,6 +307,21 @@ function SetupWizardPage({ onFinish }) {
     meta: Boolean(status?.completion?.meta),
     finish: progress >= 80,
   }), [status, progress])
+
+  const filteredMetaPages = useMemo(() => {
+    const needle = metaPageQuery.trim().toLocaleLowerCase('it')
+    if (!needle) return metaPages
+
+    return metaPages.filter((page) => {
+      const instagram = page.instagram_business_account || page.instagram || {}
+      return [
+        page.name,
+        page.category,
+        page.id,
+        instagram.username,
+      ].some((value) => String(value || '').toLocaleLowerCase('it').includes(needle))
+    })
+  }, [metaPages, metaPageQuery])
 
   const savePublicOrigin = async () => {
     setBusy('public-origin')
@@ -563,6 +579,7 @@ function SetupWizardPage({ onFinish }) {
             }
 
             setMetaPages(payload.pages || [])
+            setMetaPageQuery('')
             setMessage(
               payload.pages?.length
                 ? `Accesso riuscito come ${payload.profile?.name || 'profilo Facebook'}. Ora scegli la Pagina.`
@@ -1003,38 +1020,87 @@ function SetupWizardPage({ onFinish }) {
                 </div>
               )}
 
-              {metaPages.length > 0 && (
+              {status?.meta?.META_USER_ACCESS_TOKEN?.configured && (
                 <>
                   <div className="wizard-divider" />
                   <div className="selection-heading">
                     <span className="eyebrow">PAGINE DISPONIBILI</span>
                     <h4>Scegli Pagina Facebook e profilo Instagram</h4>
                     <p>Se la Pagina ha un account Instagram Business/Creator collegato, GE360 lo associa automaticamente.</p>
+                    <strong>{filteredMetaPages.length} Pagine trovate</strong>
                   </div>
-                  <div className="page-choice-grid">
-                    {metaPages.map((page) => (
-                      <button
-                        key={page.id}
-                        className="page-choice"
-                        onClick={() => selectMetaPage(page.id)}
-                        disabled={busy === `meta-select-${page.id}`}
-                      >
-                        <div className="page-choice-icon"><Share2 size={18} /></div>
-                        <div>
-                          <strong>{page.name || page.id}</strong>
-                          <small>{page.category || 'Pagina Facebook'}</small>
-                          {page.instagram?.connected ? (
-                            <span className="instagram-found">
-                              <Camera size={12} /> Instagram @{page.instagram.username || page.instagram.id}
-                            </span>
-                          ) : (
-                            <span className="instagram-missing">Nessun Instagram professionale collegato</span>
-                          )}
-                        </div>
-                        <ArrowRight size={16} />
-                      </button>
-                    ))}
-                  </div>
+
+                  <Field label="Cerca Pagina Facebook...">
+                    <div style={{ position: 'relative', width: '100%' }}>
+                      <Search
+                        size={16}
+                        aria-hidden="true"
+                        style={{
+                          position: 'absolute',
+                          left: 14,
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          pointerEvents: 'none',
+                          opacity: 0.65,
+                        }}
+                      />
+                      <input
+                        type="search"
+                        value={metaPageQuery}
+                        placeholder="Cerca Pagina Facebook..."
+                        onChange={(e) => setMetaPageQuery(e.target.value)}
+                        style={{
+                          width: '100%',
+                          boxSizing: 'border-box',
+                          paddingLeft: 42,
+                        }}
+                      />
+                    </div>
+                  </Field>
+
+                  {filteredMetaPages.length > 0 ? (
+                    <div
+                      className="page-choice-grid"
+                      style={{
+                        maxHeight: 550,
+                        overflowY: 'auto',
+                        overscrollBehavior: 'contain',
+                        paddingRight: 4,
+                      }}
+                    >
+                      {filteredMetaPages.map((page) => {
+                        const instagram = page.instagram_business_account || page.instagram || {}
+                        const instagramConnected = Boolean(instagram.id || page.instagram?.connected)
+                        return (
+                          <button
+                            key={page.id}
+                            className="page-choice"
+                            onClick={() => selectMetaPage(page.id)}
+                            disabled={busy === `meta-select-${page.id}`}
+                          >
+                            <div className="page-choice-icon"><Share2 size={18} /></div>
+                            <div>
+                              <strong>{page.name || page.id}</strong>
+                              <small>{page.category || 'Pagina Facebook'}</small>
+                              {instagramConnected ? (
+                                <span className="instagram-found">
+                                  <Camera size={12} /> Instagram @{instagram.username || instagram.id}
+                                </span>
+                              ) : (
+                                <span className="instagram-missing">Nessun Instagram professionale collegato</span>
+                              )}
+                            </div>
+                            <ArrowRight size={16} />
+                          </button>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <div className="wizard-help-card">
+                      <div><Search size={15} /><strong>Nessuna Pagina trovata</strong></div>
+                      <p>Prova un altro nome oppure rileggi le Pagine autorizzate da Facebook.</p>
+                    </div>
+                  )}
                 </>
               )}
 
