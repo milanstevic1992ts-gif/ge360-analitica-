@@ -186,6 +186,11 @@ def analytics_status() -> dict:
     return analytics.status()
 
 
+@app.get("/api/analytics/meta-dashboard")
+def analytics_meta_dashboard(days: int = Query(30, ge=1, le=365)) -> dict:
+    return analytics.meta_dashboard(days=days)
+
+
 @app.get("/api/analytics/metrics")
 def analytics_metrics(
     days: int = Query(30, ge=1, le=3650),
