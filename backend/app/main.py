@@ -1,8 +1,11 @@
 import asyncio
+import os
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
+from fastapi.staticfiles import StaticFiles
 
 from . import analytics, google_oauth
 from .background import auto_sync_enabled, periodic_sync
@@ -202,7 +205,7 @@ def analytics_local_seo(
     return analytics.local_seo(days=days, contains=contains, limit=limit)
 
 
-@app.get("/")
+@app.get("/api/info")
 def root() -> dict:
     return {
         "name": "GE360 Analitica",
@@ -211,3 +214,12 @@ def root() -> dict:
         "health": "/api/health",
         "chatgpt_integration": "MCP plugin",
     }
+
+
+_frontend_dir = Path(os.getenv("GE360_FRONTEND_DIR", "")).expanduser()
+if str(_frontend_dir) and _frontend_dir.is_dir():
+    app.mount(
+        "/",
+        StaticFiles(directory=str(_frontend_dir), html=True),
+        name="ge360-dashboard",
+    )
