@@ -6,6 +6,7 @@ import httpx
 
 from .base import Connector, ConnectorResult
 from .google_auth import GoogleAuth
+from ..config_store import get as config_get
 
 
 def _ga_date(value: str) -> str:
@@ -20,7 +21,7 @@ class GA4Connector(Connector):
     provider = "ga4"
 
     def __init__(self) -> None:
-        self.property_id = os.getenv("GA4_PROPERTY_ID", "").strip()
+        self.property_id = config_get("GA4_PROPERTY_ID").strip()
         self.auth = GoogleAuth()
 
     def configured(self) -> bool:
