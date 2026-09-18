@@ -1,0 +1,22 @@
+services:
+  api:
+    build: ./backend
+    container_name: ge360-analitica-api
+    env_file:
+      - .env
+    environment:
+      GE360_DB_PATH: /data/ge360.db
+    volumes:
+      - ./data:/data
+    ports:
+      - "8787:8787"
+    restart: unless-stopped
+
+  dashboard:
+    build: ./frontend
+    container_name: ge360-analitica-dashboard
+    depends_on:
+      - api
+    ports:
+      - "8788:80"
+    restart: unless-stopped
