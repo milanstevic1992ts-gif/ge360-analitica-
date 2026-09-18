@@ -1,0 +1,27 @@
+#!/bin/sh
+set -e
+
+if ! getent group ge360 >/dev/null 2>&1; then
+    addgroup --system ge360 >/dev/null
+fi
+
+if ! id ge360 >/dev/null 2>&1; then
+    adduser --system --ingroup ge360 --home /var/lib/ge360-analitica         --no-create-home --disabled-login --disabled-password ge360 >/dev/null
+fi
+
+install -d -m 0750 -o ge360 -g ge360 /var/lib/ge360-analitica
+install -d -m 0700 -o ge360 -g ge360 /var/lib/ge360-analitica/secrets
+install -d -m 0750 -o ge360 -g ge360 /var/lib/ge360-analitica/tmp
+install -d -m 0755 /etc/ge360-analitica
+
+if command -v systemctl >/dev/null 2>&1; then
+    systemctl daemon-reload || true
+    systemctl enable ge360-analitica.service >/dev/null 2>&1 || true
+    systemctl restart ge360-analitica.service || true
+fi
+
+echo
+echo "GE360 Analitica installato."
+echo "Dashboard: http://127.0.0.1:8788"
+echo "Configurazione: /etc/ge360-analitica/ge360.env"
+echo "Stato: systemctl status ge360-analitica"
