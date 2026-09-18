@@ -1,0 +1,37 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "ge360-analitica",
+  "version": "0.1.0",
+  "description": "Collega ChatGPT ai dati analytics locali di GE360 in sola lettura.",
+  "author": {
+    "name": "GE360"
+  },
+  "repository": "https://github.com/milanstevic1992ts-gif/ge360-analitica-",
+  "keywords": [
+    "analytics",
+    "marketing",
+    "wordpress",
+    "meta",
+    "google",
+    "leads",
+    "seo"
+  ],
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "GE360 Analitica",
+        "shortDescription": "Interroga i tuoi dati marketing direttamente in ChatGPT.",
+        "longDescription": "GE360 Analitica rende disponibili a ChatGPT metriche, eventi, lead aggregati e stato dei connettori tramite MCP read-only.",
+        "developerName": "GE360",
+        "category": "productivity",
+        "capabilities": ["tools"],
+        "defaultPrompt": [
+          "Analizza i dati GE360 degli ultimi 30 giorni.",
+          "Quali sorgenti stanno portando più lead?",
+          "Cosa è cambiato rispetto al periodo precedente?"
+        ],
+        "brandColor": "#657FFF"
+      }
+    }
+  }
+}
