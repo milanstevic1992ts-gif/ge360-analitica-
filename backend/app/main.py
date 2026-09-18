@@ -1,6 +1,8 @@
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
 
+from .agent import agent_health, ask_agent
 from .connectors.registry import diagnostics
 from .connectors.wordpress import WordPressConnector
 from .db import connector_states, initialize
@@ -11,6 +13,11 @@ app = FastAPI(
     version="0.1.0",
     description="API centrale per analytics, attribuzione e connettori GE360.",
 )
+
+class AgentAskRequest(BaseModel):
+    question: str = Field(min_length=2, max_length=4000)
+    period: str = Field(default="30d", pattern="^(7d|30d|90d|365d)$")
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -60,6 +67,23 @@ async def test_wordpress_connector() -> dict:
         "metrics": result.metrics,
         "message": result.message,
     }
+
+
+@app.get("/api/agent/health")
+async def get_agent_health() -> dict:
+    try:
+        return await agent_health()
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Agent Bridge non disponibile: {exc}") from exc
+
+
+@app.post("/api/agent/ask")
+async def ask_ge360_agent(request: AgentAskRequest) -> dict:
+    context = dashboard(request.period)
+    try:
+        return await ask_agent(request.question, context)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Errore agente Codex CLI: {exc}") from exc
 
 
 @app.get("/")
