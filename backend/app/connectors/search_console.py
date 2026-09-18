@@ -7,13 +7,14 @@ import httpx
 
 from .base import Connector, ConnectorResult
 from .google_auth import GoogleAuth
+from ..config_store import get as config_get
 
 
 class SearchConsoleConnector(Connector):
     provider = "search_console"
 
     def __init__(self) -> None:
-        self.site_url = os.getenv("SEARCH_CONSOLE_SITE_URL", "").strip()
+        self.site_url = config_get("SEARCH_CONSOLE_SITE_URL").strip()
         self.auth = GoogleAuth()
 
     def configured(self) -> bool:
