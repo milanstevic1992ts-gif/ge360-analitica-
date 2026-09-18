@@ -14,7 +14,7 @@ python3 -m venv "$VENV"
 echo
 echo "GE360 MCP pronto."
 echo "Ambiente MCP: $VENV"
-echo "API attesa: http://127.0.0.1:8787"
+echo "API attesa: http://127.0.0.1:8788"
 echo
 echo "Avvia GE360 con:"
 echo "  docker compose up -d --build"
