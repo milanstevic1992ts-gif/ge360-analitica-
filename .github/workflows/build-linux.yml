@@ -110,13 +110,24 @@ jobs:
           dpkg-deb --info dist/ge360-analitica_0.3.0_amd64.deb
           dpkg-deb --contents dist/ge360-analitica_0.3.0_amd64.deb | head -80
 
-      - name: Test DEB install
+      - name: Test DEB install and in-place upgrade persistence
         run: |
           sudo dpkg -i dist/ge360-analitica_0.3.0_amd64.deb
           /usr/bin/ge360-analitica version
           test -f /etc/ge360-analitica/ge360.env
           test -f /lib/systemd/system/ge360-analitica.service
           test -f /opt/ge360-analitica/www/index.html
+
+          # Simula dati/configurazione già presenti prima di un aggiornamento.
+          sudo mkdir -p /var/lib/ge360-analitica
+          echo "persistent-db-marker" | sudo tee /var/lib/ge360-analitica/upgrade-marker >/dev/null
+          echo "# user-setting-must-survive" | sudo tee -a /etc/ge360-analitica/ge360.env >/dev/null
+
+          # Reinstalla/aggiorna sopra l'installazione esistente.
+          sudo dpkg -i dist/ge360-analitica_0.3.0_amd64.deb
+
+          grep "persistent-db-marker" /var/lib/ge360-analitica/upgrade-marker
+          grep "user-setting-must-survive" /etc/ge360-analitica/ge360.env
 
       - name: Upload Linux packages
         uses: actions/upload-artifact@v4
