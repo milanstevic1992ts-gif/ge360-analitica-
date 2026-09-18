@@ -3,19 +3,22 @@ import {
   ArrowLeft,
   ArrowRight,
   Building2,
+  Camera,
   Check,
   CheckCircle2,
   CircleAlert,
-  Camera,
   Cpu,
   ExternalLink,
-  Share2,
+  FileJson,
   Globe2,
   Link2,
+  LogIn,
   RefreshCw,
   Search,
   Settings2,
+  Share2,
   Sparkles,
+  Upload,
 } from 'lucide-react'
 
 
@@ -29,13 +32,17 @@ const steps = [
 ]
 
 function SetupWizardPage({ onFinish }) {
-  const [step, setStep] = useState(() =>
-    new URLSearchParams(window.location.search).get('google') === 'connected' ? 3 : 0
-  )
+  const params = new URLSearchParams(window.location.search)
+  const [step, setStep] = useState(() => {
+    if (params.get('meta') === 'connected') return 4
+    if (params.get('google') === 'connected') return 3
+    return 0
+  })
   const [status, setStatus] = useState(null)
   const [busy, setBusy] = useState('')
   const [message, setMessage] = useState('')
   const [googleResources, setGoogleResources] = useState(null)
+  const [metaPages, setMetaPages] = useState([])
 
   const [aiBaseUrl, setAiBaseUrl] = useState('http://127.0.0.1:11434')
   const [aiModel, setAiModel] = useState('')
@@ -59,9 +66,6 @@ function SetupWizardPage({ onFinish }) {
   const [meta, setMeta] = useState({
     app_id: '',
     app_secret: '',
-    page_id: '',
-    page_access_token: '',
-    instagram_account_id: '',
     graph_version: 'v26.0',
   })
 
@@ -77,8 +81,16 @@ function SetupWizardPage({ onFinish }) {
       setAiBaseUrl(payload.ai?.base_url || 'http://127.0.0.1:11434')
       const detectedModels = payload.ai?.models || []
       const configuredModel = payload.ai?.selected_available ? payload.ai?.selected_model : ''
-      const qwenModel = detectedModels.find((item) => String(item.name || '').toLowerCase().includes('qwen'))?.name
-      setAiModel(configuredModel || qwenModel || detectedModels[0]?.name || payload.ai?.selected_model || '')
+      const qwenModel = detectedModels.find((item) =>
+        String(item.name || '').toLowerCase().includes('qwen')
+      )?.name
+      setAiModel(
+        configuredModel ||
+        qwenModel ||
+        detectedModels[0]?.name ||
+        payload.ai?.selected_model ||
+        ''
+      )
       setAiThink(Boolean(payload.ai?.think))
 
       setWordpress((prev) => ({
@@ -99,8 +111,6 @@ function SetupWizardPage({ onFinish }) {
       setMeta((prev) => ({
         ...prev,
         app_id: payload.meta?.META_APP_ID?.value || '',
-        page_id: payload.meta?.META_PAGE_ID?.value || '',
-        instagram_account_id: payload.meta?.META_INSTAGRAM_ACCOUNT_ID?.value || '',
         graph_version: payload.meta?.META_GRAPH_VERSION?.value || 'v26.0',
       }))
     } finally {
@@ -108,8 +118,67 @@ function SetupWizardPage({ onFinish }) {
     }
   }
 
+  const discoverGoogle = async ({ silent = false } = {}) => {
+    setBusy('google-discover')
+    if (!silent) setMessage('')
+    try {
+      const response = await fetch('/api/setup/google/discover')
+      const payload = await response.json()
+      if (!response.ok) throw new Error(payload.detail || 'Scoperta risorse Google fallita')
+      setGoogleResources(payload)
+
+      setGoogle((prev) => ({
+        ...prev,
+        ga4_property_id: prev.ga4_property_id || payload.ga4_properties?.[0]?.id || '',
+        search_console_site_url:
+          prev.search_console_site_url || payload.search_console_sites?.[0]?.url || '',
+        business_location_name:
+          prev.business_location_name || payload.business_locations?.[0]?.name || '',
+      }))
+
+      if (!silent) {
+        setMessage('Account Google collegato. Ho cercato automaticamente proprietà e sedi.')
+      }
+    } catch (error) {
+      if (!silent) setMessage(error.message)
+    } finally {
+      setBusy('')
+    }
+  }
+
+  const loadMetaPages = async ({ silent = false } = {}) => {
+    setBusy('meta-pages')
+    if (!silent) setMessage('')
+    try {
+      const response = await fetch('/api/oauth/meta/pages')
+      const payload = await response.json()
+      if (!response.ok) throw new Error(payload.detail || 'Non riesco a leggere le Pagine Facebook')
+      setMetaPages(payload.items || [])
+      if (!silent) {
+        setMessage(
+          payload.items?.length
+            ? 'Login Facebook riuscito. Scegli la Pagina da collegare.'
+            : 'Login riuscito, ma non vedo Pagine amministrate con questo account.'
+        )
+      }
+    } catch (error) {
+      if (!silent) setMessage(error.message)
+    } finally {
+      setBusy('')
+    }
+  }
+
   useEffect(() => {
-    loadStatus()
+    const initialize = async () => {
+      await loadStatus()
+      if (params.get('google') === 'connected') {
+        await discoverGoogle({ silent: true })
+      }
+      if (params.get('meta') === 'connected') {
+        await loadMetaPages({ silent: true })
+      }
+    }
+    initialize()
   }, [])
 
   const progress = status?.percent || 0
@@ -131,11 +200,7 @@ function SetupWizardPage({ onFinish }) {
       const response = await fetch('/api/local-ai/configure', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          base_url: aiBaseUrl,
-          model: aiModel,
-          think: aiThink,
-        }),
+        body: JSON.stringify({ base_url: aiBaseUrl, model: aiModel, think: aiThink }),
       })
       const payload = await response.json()
       if (!response.ok) throw new Error(payload.detail || 'Configurazione AI non salvata')
@@ -173,7 +238,33 @@ function SetupWizardPage({ onFinish }) {
     }
   }
 
-  const saveGoogle = async () => {
+  const importGoogleJson = async (event) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    setBusy('google-import')
+    setMessage('')
+    try {
+      const parsed = JSON.parse(await file.text())
+      const response = await fetch('/api/setup/google/import-oauth-json', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ payload: parsed }),
+      })
+      const payload = await response.json()
+      if (!response.ok) throw new Error(payload.detail || 'File Google OAuth non valido')
+
+      setMessage(payload.message)
+      await loadStatus()
+    } catch (error) {
+      setMessage(`Importazione Google fallita: ${error.message}`)
+    } finally {
+      event.target.value = ''
+      setBusy('')
+    }
+  }
+
+  const saveGoogleAdvanced = async () => {
     setBusy('google-save')
     setMessage('')
     try {
@@ -184,7 +275,7 @@ function SetupWizardPage({ onFinish }) {
       })
       const payload = await response.json()
       if (!response.ok) throw new Error(payload.detail || 'Impostazioni Google non salvate')
-      setMessage('Credenziali Google salvate. Ora puoi collegare il tuo account.')
+      setMessage('Configurazione Google salvata.')
       await loadStatus()
     } catch (error) {
       setMessage(error.message)
@@ -197,37 +288,40 @@ function SetupWizardPage({ onFinish }) {
     setBusy('google-login')
     setMessage('')
     try {
-      await saveGoogle()
       const response = await fetch('/api/oauth/google/start')
       const payload = await response.json()
-      if (!response.ok) throw new Error(payload.detail || 'OAuth Google non pronto')
+      if (!response.ok) throw new Error(payload.detail || 'Google Login non ancora configurato')
       window.location.href = payload.authorization_url
     } catch (error) {
-      setMessage(error.message)
+      setMessage(
+        `${error.message}. Se è la prima volta, importa il file OAuth JSON nella sezione qui sotto.`
+      )
       setBusy('')
     }
   }
 
-  const discoverGoogle = async () => {
-    setBusy('google-discover')
+  const saveGoogleSelections = async () => {
+    await saveGoogleAdvanced()
+    setMessage('Selezioni Google salvate.')
+  }
+
+  const saveMetaCredentials = async () => {
+    setBusy('meta-save')
     setMessage('')
     try {
-      const response = await fetch('/api/setup/google/discover')
+      const response = await fetch('/api/setup/meta/credentials', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(meta),
+      })
       const payload = await response.json()
-      if (!response.ok) throw new Error(payload.detail || 'Scoperta risorse Google fallita')
-      setGoogleResources(payload)
-
-      const next = {
-        ...google,
-        ga4_property_id:
-          google.ga4_property_id || payload.ga4_properties?.[0]?.id || '',
-        search_console_site_url:
-          google.search_console_site_url || payload.search_console_sites?.[0]?.url || '',
-        business_location_name:
-          google.business_location_name || payload.business_locations?.[0]?.name || '',
-      }
-      setGoogle(next)
-      setMessage('Risorse Google rilevate. Scegli quelle corrette e salva.')
+      if (!response.ok) throw new Error(payload.detail || 'Configurazione Meta non salvata')
+      setMessage(
+        payload.oauth_ready
+          ? 'Configurazione Meta pronta. Ora premi Accedi con Facebook.'
+          : 'Servono App ID e App Secret.'
+      )
+      await loadStatus()
     } catch (error) {
       setMessage(error.message)
     } finally {
@@ -235,27 +329,38 @@ function SetupWizardPage({ onFinish }) {
     }
   }
 
-  const saveMeta = async () => {
-    setBusy('meta')
+  const connectMeta = async () => {
+    setBusy('meta-login')
     setMessage('')
     try {
-      const response = await fetch('/api/setup/meta', {
+      const response = await fetch('/api/oauth/meta/start')
+      const payload = await response.json()
+      if (!response.ok) throw new Error(payload.detail || 'Facebook Login non ancora configurato')
+      window.location.href = payload.authorization_url
+    } catch (error) {
+      setMessage(
+        `${error.message}. Apri "Configurazione una tantum" e inserisci App ID/Secret.`
+      )
+      setBusy('')
+    }
+  }
+
+  const selectMetaPage = async (pageId) => {
+    setBusy(`meta-select-${pageId}`)
+    setMessage('')
+    try {
+      const response = await fetch('/api/oauth/meta/select-page', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(meta),
+        body: JSON.stringify({ page_id: pageId }),
       })
       const payload = await response.json()
-      if (!response.ok) throw new Error(payload.detail || 'Meta non collegato')
-
-      setMeta((prev) => ({
-        ...prev,
-        instagram_account_id: payload.instagram?.id || prev.instagram_account_id,
-      }))
+      if (!response.ok) throw new Error(payload.detail || 'Pagina non collegata')
 
       setMessage(
         payload.instagram?.connected
-          ? `Facebook OK · Instagram @${payload.instagram.username || payload.instagram.id} rilevato`
-          : 'Facebook OK. Nessun account Instagram professionale collegato alla Pagina.'
+          ? `Collegato: ${payload.facebook_page.name} + Instagram @${payload.instagram.username || payload.instagram.id}`
+          : `Collegato: ${payload.facebook_page.name}. Instagram professionale non rilevato.`
       )
       await loadStatus()
     } catch (error) {
@@ -288,10 +393,10 @@ function SetupWizardPage({ onFinish }) {
       <section className="setup-header">
         <div>
           <span className="eyebrow">CONFIGURAZIONE GUIDATA</span>
-          <h2>Impostiamo GE360 passo per passo</h2>
+          <h2>Collega gli account senza cercare ID e token</h2>
           <p>
-            Il wizard rileva ciò che hai già sul Linux e ti chiede solo quello che manca.
-            Password e token restano sul tuo server.
+            GE360 usa login OAuth per Google e Meta. La parte tecnica resta nascosta e si fa
+            una sola volta; poi scegli semplicemente account, proprietà o Pagina.
           </p>
         </div>
         <div className="setup-progress-card">
@@ -315,7 +420,10 @@ function SetupWizardPage({ onFinish }) {
                 <span className={done ? 'step-icon done' : 'step-icon'}>
                   {done ? <Check size={15} /> : <Icon size={15} />}
                 </span>
-                <span><strong>{index + 1}. {item.label}</strong><small>{done ? 'Pronto' : 'Da completare'}</small></span>
+                <span>
+                  <strong>{index + 1}. {item.label}</strong>
+                  <small>{done ? 'Pronto' : 'Da completare'}</small>
+                </span>
               </button>
             )
           })}
@@ -327,15 +435,13 @@ function SetupWizardPage({ onFinish }) {
             <div><span>PASSAGGIO {step + 1} DI {steps.length}</span><h3>{current.label}</h3></div>
           </div>
 
-          {step === 0 && (
-            <SystemStep status={status} reload={loadStatus} busy={busy} />
-          )}
+          {step === 0 && <SystemStep status={status} reload={loadStatus} busy={busy} />}
 
           {step === 1 && (
             <section className="wizard-form">
               <GuideText
                 title="GE360 cerca Ollama già installato"
-                text="Non scarichiamo nulla. Se Ollama gira sullo stesso Linux, lascia 127.0.0.1:11434 e scegli uno dei modelli già presenti."
+                text="Non scarichiamo nulla. Scegli uno dei modelli che GE360 trova già sul tuo Linux."
               />
               <Field label="Server Ollama">
                 <input value={aiBaseUrl} onChange={(e) => setAiBaseUrl(e.target.value)} />
@@ -352,7 +458,7 @@ function SetupWizardPage({ onFinish }) {
               </Field>
               <label className="wizard-check">
                 <input type="checkbox" checked={aiThink} onChange={(e) => setAiThink(e.target.checked)} />
-                <span><strong>Thinking / reasoning</strong><small>Attivalo solo se il tuo Qwen lo supporta.</small></span>
+                <span><strong>Thinking / reasoning</strong><small>Attivalo solo se il modello lo supporta.</small></span>
               </label>
               <ActionRow>
                 <button className="secondary-action" onClick={loadStatus}><RefreshCw size={14} /> Rileva di nuovo</button>
@@ -364,32 +470,29 @@ function SetupWizardPage({ onFinish }) {
           {step === 2 && (
             <section className="wizard-form">
               <GuideText
-                title="Colleghiamo il tuo WordPress"
-                text="Il sito può essere letto via REST. Per gli eventi GE360 copia la chiave da WordPress → Impostazioni → GE360 Tracker."
+                title="WordPress"
+                text="Incolla la chiave del plugin GE360 Tracker. Hai già trovato questa parte, quindi non serve altro."
               />
-              <ol className="wizard-numbered">
-                <li><strong>Apri WordPress</strong><span>Vai su Impostazioni → GE360 Tracker.</span></li>
-                <li><strong>Copia la chiave sincronizzazione</strong><span>Non è la password WordPress: serve solo a GE360 per leggere gli eventi del tracker.</span></li>
-                <li><strong>Incollala qui e premi Salva e testa</strong><span>GE360 controllerà sito, pagine, articoli e tracker.</span></li>
-              </ol>
               <Field label="URL sito">
                 <input value={wordpress.base_url} onChange={(e) => setWordpress({ ...wordpress, base_url: e.target.value })} />
               </Field>
-              <Field label="Utente WordPress (opzionale)">
-                <input value={wordpress.username} onChange={(e) => setWordpress({ ...wordpress, username: e.target.value })} />
-              </Field>
-              <Field
-                label="Application Password (opzionale)"
-                hint={status?.wordpress?.WORDPRESS_APP_PASSWORD?.configured ? 'Già configurata: lascia vuoto per conservarla.' : ''}
-              >
-                <input type="password" value={wordpress.app_password} onChange={(e) => setWordpress({ ...wordpress, app_password: e.target.value })} />
-              </Field>
               <Field
                 label="Chiave GE360 Tracker"
-                hint={status?.wordpress?.WORDPRESS_GE360_KEY?.configured ? 'Già configurata: lascia vuoto per conservarla.' : 'La trovi nella pagina impostazioni del plugin GE360 Tracker.'}
+                hint={status?.wordpress?.WORDPRESS_GE360_KEY?.configured ? 'Già configurata: lascia vuoto per conservarla.' : ''}
               >
                 <input type="password" value={wordpress.ge360_key} onChange={(e) => setWordpress({ ...wordpress, ge360_key: e.target.value })} />
               </Field>
+              <details className="advanced-box">
+                <summary>Opzioni WordPress avanzate</summary>
+                <div className="advanced-box-body">
+                  <Field label="Utente WordPress (opzionale)">
+                    <input value={wordpress.username} onChange={(e) => setWordpress({ ...wordpress, username: e.target.value })} />
+                  </Field>
+                  <Field label="Application Password (opzionale)">
+                    <input type="password" value={wordpress.app_password} onChange={(e) => setWordpress({ ...wordpress, app_password: e.target.value })} />
+                  </Field>
+                </div>
+              </details>
               <ActionRow>
                 <button className="primary-action" onClick={saveWordPress} disabled={busy === 'wordpress'}>
                   <Link2 size={14} /> Salva e testa WordPress
@@ -401,147 +504,226 @@ function SetupWizardPage({ onFinish }) {
           {step === 3 && (
             <section className="wizard-form">
               <GuideText
-                title="Un login Google per Analytics, Search Console e Business Profile"
-                text="Inserisci una volta Client ID e Client Secret. Dopo il login GE360 prova a trovarti automaticamente proprietà, siti e sedi."
+                title="Google: fai login e GE360 trova il resto"
+                text="Dopo l'accesso, GE360 cerca automaticamente Analytics, Search Console e Google Business Profile."
               />
-              <div className="wizard-help-card">
-                <div><Building2 size={18} /><strong>Prima volta? Segui questi passaggi</strong></div>
-                <ol className="wizard-numbered compact">
-                  <li><strong>Apri Google Cloud</strong><span>Usa o crea un progetto dedicato a GE360.</span></li>
-                  <li><strong>Abilita le API</strong><span>Analytics Data/Admin, Search Console e Business Profile.</span></li>
-                  <li><strong>Crea credenziali OAuth → Applicazione Web</strong><span>Copia Client ID e Client Secret.</span></li>
-                  <li><strong>Aggiungi questo URI di reindirizzamento</strong><span>Deve essere identico a quello mostrato sotto.</span></li>
-                </ol>
-                <code>http://127.0.0.1:8788/api/oauth/google/callback</code>
-                <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noreferrer">
-                  Apri Google Cloud Credentials <ExternalLink size={13} />
-                </a>
-                <p>Nota: Google Business Profile può richiedere che il progetto abbia accesso alle Business Profile APIs. Se non compare una sede, Analytics e Search Console possono comunque funzionare.</p>
+
+              <div className={status?.completion?.google_connected ? 'login-card connected' : 'login-card'}>
+                <div className="login-card-icon"><Search size={24} /></div>
+                <div>
+                  <strong>{status?.completion?.google_connected ? 'Google collegato' : 'Accedi con Google'}</strong>
+                  <p>
+                    {status?.completion?.google_connected
+                      ? 'Account autorizzato. Ora possiamo cercare le proprietà disponibili.'
+                      : 'Apri la pagina Google, scegli il tuo account e autorizza GE360.'}
+                  </p>
+                </div>
+                <button className="primary-action login-action" onClick={connectGoogle} disabled={Boolean(busy)}>
+                  <LogIn size={15} /> {status?.completion?.google_connected ? 'Ricollega' : 'Accedi con Google'}
+                </button>
               </div>
-              <Field label="Google Client ID">
-                <input value={google.client_id} onChange={(e) => setGoogle({ ...google, client_id: e.target.value })} />
-              </Field>
-              <Field
-                label="Google Client Secret"
-                hint={status?.google?.GOOGLE_CLIENT_SECRET?.configured ? 'Già configurato: lascia vuoto per conservarlo.' : ''}
-              >
-                <input type="password" value={google.client_secret} onChange={(e) => setGoogle({ ...google, client_secret: e.target.value })} />
-              </Field>
 
-              <ActionRow>
-                <button className="secondary-action" onClick={saveGoogle} disabled={Boolean(busy)}>
-                  <Check size={14} /> Salva credenziali
-                </button>
-                <button className="primary-action" onClick={connectGoogle} disabled={Boolean(busy)}>
-                  <ExternalLink size={14} /> Collega account Google
-                </button>
-              </ActionRow>
-
-              {status?.completion?.google_connected && (
-                <div className="wizard-success"><CheckCircle2 size={17} /> Account Google collegato.</div>
+              {!status?.completion?.google_credentials && (
+                <div className="one-time-setup">
+                  <div className="one-time-heading">
+                    <FileJson size={18} />
+                    <div><strong>Prima volta: importa il file OAuth di Google</strong><span>È una configurazione una tantum.</span></div>
+                  </div>
+                  <p>
+                    Da Google Cloud crea un client OAuth <strong>Applicazione Web</strong>,
+                    aggiungi il redirect GE360 e scarica il file JSON. Poi caricalo qui.
+                  </p>
+                  <code>http://127.0.0.1:8788/api/oauth/google/callback</code>
+                  <div className="one-time-actions">
+                    <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noreferrer">
+                      Apri Google Cloud <ExternalLink size={13} />
+                    </a>
+                    <label className="secondary-action file-action">
+                      <Upload size={14} /> Importa JSON OAuth
+                      <input type="file" accept=".json,application/json" onChange={importGoogleJson} />
+                    </label>
+                  </div>
+                </div>
               )}
 
-              <div className="wizard-divider" />
+              <details className="advanced-box">
+                <summary>Configurazione Google avanzata</summary>
+                <div className="advanced-box-body">
+                  <Field label="Client ID">
+                    <input value={google.client_id} onChange={(e) => setGoogle({ ...google, client_id: e.target.value })} />
+                  </Field>
+                  <Field
+                    label="Client Secret"
+                    hint={status?.google?.GOOGLE_CLIENT_SECRET?.configured ? 'Già configurato: lascia vuoto per conservarlo.' : ''}
+                  >
+                    <input type="password" value={google.client_secret} onChange={(e) => setGoogle({ ...google, client_secret: e.target.value })} />
+                  </Field>
+                  <button className="secondary-action" onClick={saveGoogleAdvanced}>Salva configurazione</button>
+                </div>
+              </details>
 
-              <ActionRow>
-                <button className="secondary-action" onClick={discoverGoogle} disabled={!status?.completion?.google_connected || Boolean(busy)}>
-                  <RefreshCw size={14} /> Trova automaticamente proprietà e sedi
-                </button>
-              </ActionRow>
+              {status?.completion?.google_connected && (
+                <>
+                  <div className="wizard-divider" />
+                  <ActionRow>
+                    <button className="secondary-action" onClick={() => discoverGoogle()} disabled={Boolean(busy)}>
+                      <RefreshCw size={14} /> Trova automaticamente tutto
+                    </button>
+                  </ActionRow>
 
-              <Field label="Proprietà GA4">
-                {googleResources?.ga4_properties?.length ? (
-                  <select value={google.ga4_property_id} onChange={(e) => setGoogle({ ...google, ga4_property_id: e.target.value })}>
-                    <option value="">Seleziona</option>
-                    {googleResources.ga4_properties.map((item) => (
-                      <option key={item.id} value={item.id}>{item.name} · {item.id}</option>
-                    ))}
-                  </select>
-                ) : (
-                  <input value={google.ga4_property_id} onChange={(e) => setGoogle({ ...google, ga4_property_id: e.target.value })} placeholder="es. 123456789" />
-                )}
-              </Field>
+                  {googleResources && (
+                    <div className="auto-found-grid">
+                      <FoundCard label="Analytics" count={googleResources.ga4_properties?.length || 0} />
+                      <FoundCard label="Search Console" count={googleResources.search_console_sites?.length || 0} />
+                      <FoundCard label="Business Profile" count={googleResources.business_locations?.length || 0} />
+                    </div>
+                  )}
 
-              <Field label="Search Console">
-                {googleResources?.search_console_sites?.length ? (
-                  <select value={google.search_console_site_url} onChange={(e) => setGoogle({ ...google, search_console_site_url: e.target.value })}>
-                    <option value="">Seleziona</option>
-                    {googleResources.search_console_sites.map((item) => (
-                      <option key={item.url} value={item.url}>{item.url}</option>
-                    ))}
-                  </select>
-                ) : (
-                  <input value={google.search_console_site_url} onChange={(e) => setGoogle({ ...google, search_console_site_url: e.target.value })} />
-                )}
-              </Field>
+                  <Field label="Google Analytics">
+                    {googleResources?.ga4_properties?.length ? (
+                      <select value={google.ga4_property_id} onChange={(e) => setGoogle({ ...google, ga4_property_id: e.target.value })}>
+                        <option value="">Seleziona proprietà</option>
+                        {googleResources.ga4_properties.map((item) => (
+                          <option key={item.id} value={item.id}>{item.name} · {item.id}</option>
+                        ))}
+                      </select>
+                    ) : <input value={google.ga4_property_id} onChange={(e) => setGoogle({ ...google, ga4_property_id: e.target.value })} />}
+                  </Field>
 
-              <Field label="Google Business Profile">
-                {googleResources?.business_locations?.length ? (
-                  <select value={google.business_location_name} onChange={(e) => setGoogle({ ...google, business_location_name: e.target.value })}>
-                    <option value="">Seleziona</option>
-                    {googleResources.business_locations.map((item) => (
-                      <option key={item.name} value={item.name}>{item.title || item.name}</option>
-                    ))}
-                  </select>
-                ) : (
-                  <input value={google.business_location_name} onChange={(e) => setGoogle({ ...google, business_location_name: e.target.value })} placeholder="locations/..." />
-                )}
-              </Field>
+                  <Field label="Search Console">
+                    {googleResources?.search_console_sites?.length ? (
+                      <select value={google.search_console_site_url} onChange={(e) => setGoogle({ ...google, search_console_site_url: e.target.value })}>
+                        <option value="">Seleziona sito</option>
+                        {googleResources.search_console_sites.map((item) => (
+                          <option key={item.url} value={item.url}>{item.url}</option>
+                        ))}
+                      </select>
+                    ) : <input value={google.search_console_site_url} onChange={(e) => setGoogle({ ...google, search_console_site_url: e.target.value })} />}
+                  </Field>
 
-              <ActionRow>
-                <button className="primary-action" onClick={saveGoogle} disabled={Boolean(busy)}>
-                  <Check size={14} /> Salva selezioni Google
-                </button>
-              </ActionRow>
+                  <Field label="Google Business Profile">
+                    {googleResources?.business_locations?.length ? (
+                      <select value={google.business_location_name} onChange={(e) => setGoogle({ ...google, business_location_name: e.target.value })}>
+                        <option value="">Seleziona attività</option>
+                        {googleResources.business_locations.map((item) => (
+                          <option key={item.name} value={item.name}>{item.title || item.name}</option>
+                        ))}
+                      </select>
+                    ) : <input value={google.business_location_name} onChange={(e) => setGoogle({ ...google, business_location_name: e.target.value })} />}
+                  </Field>
+
+                  <ActionRow>
+                    <button className="primary-action" onClick={saveGoogleSelections}>
+                      <Check size={14} /> Salva account trovati
+                    </button>
+                  </ActionRow>
+                </>
+              )}
             </section>
           )}
 
           {step === 4 && (
             <section className="wizard-form">
               <GuideText
-                title="Facebook e Instagram insieme"
-                text="GE360 usa la Meta Graph API. Con Facebook Login, Instagram deve essere un account professionale collegato alla Pagina Facebook."
+                title="Facebook e Instagram: un solo login"
+                text="Fai accesso con Facebook. GE360 legge le Pagine che amministri e prova a trovare l'Instagram professionale collegato."
               />
-              <ol className="wizard-numbered">
-                <li><strong>Controlla Instagram</strong><span>L'account deve essere Business o Creator, non personale.</span></li>
-                <li><strong>Collegalo alla Pagina Facebook</strong><span>Verifica il collegamento in Meta Business Suite / impostazioni della Pagina.</span></li>
-                <li><strong>Apri Meta for Developers</strong><span>Crea o seleziona l'app che userai per GE360.</span></li>
-                <li><strong>Ottieni Page ID e Page Access Token</strong><span>Incollali qui. GE360 proverà a trovare da solo l'Instagram Business Account ID.</span></li>
-              </ol>
-              <div className="social-guide-grid">
-                <div><Share2 size={18} /><strong>Facebook</strong><span>Pagina professionale + Page Access Token</span></div>
-                <div><Camera size={18} /><strong>Instagram</strong><span>Business/Creator collegato alla Pagina</span></div>
-              </div>
-              <a className="wizard-external-link" href="https://developers.facebook.com/apps/" target="_blank" rel="noreferrer">
-                Apri Meta for Developers <ExternalLink size={13} />
-              </a>
 
-              <Field label="Meta App ID">
-                <input value={meta.app_id} onChange={(e) => setMeta({ ...meta, app_id: e.target.value })} />
-              </Field>
-              <Field
-                label="Meta App Secret"
-                hint={status?.meta?.META_APP_SECRET?.configured ? 'Già configurato: lascia vuoto per conservarlo.' : ''}
-              >
-                <input type="password" value={meta.app_secret} onChange={(e) => setMeta({ ...meta, app_secret: e.target.value })} />
-              </Field>
-              <Field label="Facebook Page ID">
-                <input value={meta.page_id} onChange={(e) => setMeta({ ...meta, page_id: e.target.value })} />
-              </Field>
-              <Field
-                label="Page Access Token"
-                hint={status?.meta?.META_PAGE_ACCESS_TOKEN?.configured ? 'Già configurato: lascia vuoto per conservarlo.' : 'Usa un token della Pagina, non la password Facebook.'}
-              >
-                <textarea rows={3} value={meta.page_access_token} onChange={(e) => setMeta({ ...meta, page_access_token: e.target.value })} />
-              </Field>
-              <Field label="Instagram Business Account ID" hint="Puoi lasciarlo vuoto: GE360 proverà a rilevarlo dalla Pagina.">
-                <input value={meta.instagram_account_id} onChange={(e) => setMeta({ ...meta, instagram_account_id: e.target.value })} />
-              </Field>
-              <ActionRow>
-                <button className="primary-action" onClick={saveMeta} disabled={busy === 'meta'}>
-                  <Link2 size={14} /> Salva, testa e trova Instagram
+              <div className={status?.completion?.meta ? 'login-card connected' : 'login-card'}>
+                <div className="login-card-icon"><Share2 size={24} /></div>
+                <div>
+                  <strong>{status?.completion?.meta ? 'Facebook / Instagram collegati' : 'Accedi con Facebook'}</strong>
+                  <p>
+                    Niente Page ID o token da copiare: dopo il login scegli la Pagina da un elenco.
+                  </p>
+                </div>
+                <button className="primary-action login-action" onClick={connectMeta} disabled={Boolean(busy)}>
+                  <LogIn size={15} /> {status?.completion?.meta ? 'Ricollega' : 'Accedi con Facebook'}
                 </button>
-              </ActionRow>
+              </div>
+
+              {!status?.meta?.META_APP_ID?.configured || !status?.meta?.META_APP_SECRET?.configured ? (
+                <div className="one-time-setup">
+                  <div className="one-time-heading">
+                    <Settings2 size={18} />
+                    <div><strong>Prima volta: identifica GE360 a Meta</strong><span>App ID e Secret si inseriscono una volta sola.</span></div>
+                  </div>
+                  <ol className="wizard-numbered compact">
+                    <li><strong>Apri Meta for Developers</strong><span>Crea/seleziona una app adatta alla gestione della tua Pagina.</span></li>
+                    <li><strong>Configura Facebook Login</strong><span>Aggiungi il redirect GE360 indicato sotto.</span></li>
+                    <li><strong>Copia App ID e App Secret</strong><span>Poi non dovrai più cercare Page ID o token.</span></li>
+                  </ol>
+                  <code>http://127.0.0.1:8788/api/oauth/meta/callback</code>
+                  <a className="wizard-external-link" href="https://developers.facebook.com/apps/" target="_blank" rel="noreferrer">
+                    Apri Meta for Developers <ExternalLink size={13} />
+                  </a>
+                  <div className="advanced-box-body meta-onetime-fields">
+                    <Field label="Meta App ID">
+                      <input value={meta.app_id} onChange={(e) => setMeta({ ...meta, app_id: e.target.value })} />
+                    </Field>
+                    <Field
+                      label="Meta App Secret"
+                      hint={status?.meta?.META_APP_SECRET?.configured ? 'Già salvato: lascia vuoto per conservarlo.' : ''}
+                    >
+                      <input type="password" value={meta.app_secret} onChange={(e) => setMeta({ ...meta, app_secret: e.target.value })} />
+                    </Field>
+                    <button className="secondary-action" onClick={saveMetaCredentials}>Salva configurazione una tantum</button>
+                  </div>
+                </div>
+              ) : (
+                <details className="advanced-box">
+                  <summary>Configurazione Meta avanzata</summary>
+                  <div className="advanced-box-body">
+                    <Field label="Meta App ID">
+                      <input value={meta.app_id} onChange={(e) => setMeta({ ...meta, app_id: e.target.value })} />
+                    </Field>
+                    <Field label="Meta App Secret">
+                      <input type="password" value={meta.app_secret} onChange={(e) => setMeta({ ...meta, app_secret: e.target.value })} />
+                    </Field>
+                    <button className="secondary-action" onClick={saveMetaCredentials}>Aggiorna</button>
+                  </div>
+                </details>
+              )}
+
+              {metaPages.length > 0 && (
+                <>
+                  <div className="wizard-divider" />
+                  <div className="selection-heading">
+                    <span className="eyebrow">SCEGLI LA PAGINA</span>
+                    <h4>Quale attività vuoi collegare a GE360?</h4>
+                  </div>
+                  <div className="page-choice-grid">
+                    {metaPages.map((page) => (
+                      <button
+                        key={page.id}
+                        className="page-choice"
+                        onClick={() => selectMetaPage(page.id)}
+                        disabled={busy === `meta-select-${page.id}`}
+                      >
+                        <div className="page-choice-icon"><Share2 size={18} /></div>
+                        <div>
+                          <strong>{page.name || page.id}</strong>
+                          <small>{page.category || 'Pagina Facebook'}</small>
+                          {page.instagram?.connected ? (
+                            <span className="instagram-found"><Camera size={12} /> @{page.instagram.username || page.instagram.id}</span>
+                          ) : (
+                            <span className="instagram-missing">Instagram non rilevato</span>
+                          )}
+                        </div>
+                        <ArrowRight size={16} />
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {(params.get('meta') === 'connected' || status?.meta?.META_USER_ACCESS_TOKEN?.configured) && (
+                <ActionRow>
+                  <button className="secondary-action" onClick={() => loadMetaPages()}>
+                    <RefreshCw size={14} /> Rileggi le Pagine disponibili
+                  </button>
+                </ActionRow>
+              )}
             </section>
           )}
 
@@ -549,14 +731,14 @@ function SetupWizardPage({ onFinish }) {
             <section className="wizard-form">
               <GuideText
                 title="Controllo finale"
-                text="Non serve avere tutto per iniziare: GE360 funziona anche con una parte delle fonti. Qui vedi cosa è pronto."
+                text="Qui verifichiamo tutto e lanciamo una sincronizzazione completa."
               />
               <div className="setup-review-grid">
                 <Review label="AI locale" ok={status?.completion?.ai} />
                 <Review label="WordPress Tracker" ok={status?.completion?.wordpress} />
                 <Review label="Google OAuth" ok={status?.completion?.google_connected} />
                 <Review label="Risorse Google" ok={status?.completion?.google_resources} />
-                <Review label="Facebook / Meta" ok={status?.completion?.meta} />
+                <Review label="Facebook / Instagram" ok={status?.completion?.meta} />
               </div>
               <ActionRow>
                 <button className="primary-action" onClick={finalSync} disabled={busy === 'sync'}>
@@ -565,7 +747,10 @@ function SetupWizardPage({ onFinish }) {
               </ActionRow>
               <div className="wizard-final-note">
                 <Sparkles size={18} />
-                <div><strong>Dopo la prima sincronizzazione</strong><p>Vai su AI Locale e genera il primo Report completo. Qwen userà solo i dati che GE360 è riuscito realmente a raccogliere.</p></div>
+                <div>
+                  <strong>Dopo la prima sincronizzazione</strong>
+                  <p>Vai su AI Locale e genera il primo Report completo con Qwen.</p>
+                </div>
               </div>
             </section>
           )}
@@ -603,36 +788,19 @@ function SystemStep({ status, reload, busy }) {
     <section className="wizard-form">
       <GuideText
         title="GE360 controlla ciò che è già presente"
-        text="Non reinstalliamo niente. Il programma verifica AI locale, configurazioni esistenti e connessioni già salvate."
+        text="Non reinstalliamo niente. Verifichiamo AI locale e connessioni già salvate."
       />
       <div className="system-detect-grid">
-        <Detection
-          label="Ollama"
-          value={status?.ai?.ok ? 'Rilevato' : 'Non raggiungibile'}
-          ok={status?.ai?.ok}
-          detail={status?.ai?.base_url}
-        />
+        <Detection label="Ollama" value={status?.ai?.ok ? 'Rilevato' : 'Non raggiungibile'} ok={status?.ai?.ok} detail={status?.ai?.base_url} />
         <Detection
           label="Modello AI"
           value={status?.ai?.selected_available ? status.ai.selected_model : 'Da scegliere'}
           ok={status?.ai?.selected_available}
           detail={status?.ai?.models?.length ? `${status.ai.models.length} modelli trovati` : 'Nessun modello rilevato'}
         />
-        <Detection
-          label="WordPress"
-          value={status?.completion?.wordpress ? 'Configurato' : 'Da completare'}
-          ok={status?.completion?.wordpress}
-        />
-        <Detection
-          label="Google"
-          value={status?.completion?.google_connected ? 'Account collegato' : 'Da collegare'}
-          ok={status?.completion?.google_connected}
-        />
-        <Detection
-          label="Meta"
-          value={status?.completion?.meta ? 'Configurato' : 'Da completare'}
-          ok={status?.completion?.meta}
-        />
+        <Detection label="WordPress" value={status?.completion?.wordpress ? 'Configurato' : 'Da completare'} ok={status?.completion?.wordpress} />
+        <Detection label="Google" value={status?.completion?.google_connected ? 'Account collegato' : 'Da collegare'} ok={status?.completion?.google_connected} />
+        <Detection label="Facebook / Instagram" value={status?.completion?.meta ? 'Collegati' : 'Da collegare'} ok={status?.completion?.meta} />
       </div>
       <ActionRow>
         <button className="secondary-action" onClick={reload} disabled={busy === 'status'}>
@@ -677,6 +845,15 @@ function Review({ label, ok }) {
       {ok ? <CheckCircle2 size={17} /> : <CircleAlert size={17} />}
       <span>{label}</span>
       <strong>{ok ? 'Pronto' : 'Da completare'}</strong>
+    </div>
+  )
+}
+
+function FoundCard({ label, count }) {
+  return (
+    <div className={count ? 'found-card ok' : 'found-card'}>
+      {count ? <CheckCircle2 size={16} /> : <CircleAlert size={16} />}
+      <div><strong>{label}</strong><span>{count ? `${count} trovati` : 'Nessuno trovato'}</span></div>
     </div>
   )
 }
