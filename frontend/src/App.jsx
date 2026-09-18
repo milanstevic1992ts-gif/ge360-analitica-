@@ -178,7 +178,7 @@ function App() {
           </div>
 
           <div className="top-actions">
-            <div className="live-pill"><span /> Dati demo</div>
+            <div className={`live-pill ${data?.mode === 'live' ? 'is-live' : ''}`}><span /> {data?.mode === 'live' ? 'Dati reali' : 'Dati demo'}</div>
             <button className="icon-button"><Bell size={19} /></button>
             <div className="avatar">MS</div>
           </div>
