@@ -1,4 +1,4 @@
-# GE360 Analitica 0.6
+# GE360 Analitica 0.6.1
 
 Dashboard self-hosted per WordPress, Google, Facebook/Instagram, lead, SEO locale e AI locale Ollama/Qwen.
 
@@ -95,7 +95,7 @@ I token Meta e Google non vengono restituiti in chiaro dall'API di stato.
 Installa la nuova versione sopra quella precedente:
 
 ```bash
-sudo apt install ./ge360-analitica_0.6.0_amd64.deb
+sudo apt install ./ge360-analitica_0.6.1_amd64.deb
 ```
 
 Non disinstallare prima. Database, report e configurazione persistente vengono conservati.
