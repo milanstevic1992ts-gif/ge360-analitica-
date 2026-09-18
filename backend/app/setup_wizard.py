@@ -31,7 +31,7 @@ class MetaSetupRequest(BaseModel):
     app_id: str = Field(default="", max_length=200)
     app_secret: str = Field(default="", max_length=500)
     page_id: str = Field(min_length=1, max_length=200)
-    page_access_token: str = Field(min_length=10, max_length=5000)
+    page_access_token: str = Field(default="", max_length=5000)
     instagram_account_id: str = Field(default="", max_length=200)
     graph_version: str = Field(default="v26.0", max_length=20)
 
@@ -100,14 +100,15 @@ async def status() -> dict[str, Any]:
 
 
 async def save_and_test_wordpress(request: WordPressSetupRequest) -> dict[str, Any]:
-    set_many(
-        {
-            "WORDPRESS_BASE_URL": request.base_url.rstrip("/"),
-            "WORDPRESS_USERNAME": request.username,
-            "WORDPRESS_APP_PASSWORD": request.app_password,
-            "WORDPRESS_GE360_KEY": request.ge360_key,
-        }
-    )
+    values = {
+        "WORDPRESS_BASE_URL": request.base_url.rstrip("/"),
+        "WORDPRESS_USERNAME": request.username,
+    }
+    if request.app_password:
+        values["WORDPRESS_APP_PASSWORD"] = request.app_password
+    if request.ge360_key:
+        values["WORDPRESS_GE360_KEY"] = request.ge360_key
+    set_many(values)
 
     connector = WordPressConnector()
     result = await connector.sync()
@@ -123,13 +124,14 @@ async def save_and_test_wordpress(request: WordPressSetupRequest) -> dict[str, A
 
 def save_google(request: GoogleSetupRequest) -> dict[str, Any]:
     values = {
-        "GOOGLE_CLIENT_ID": request.client_id,
-        "GOOGLE_CLIENT_SECRET": request.client_secret,
+        "GOOGLE_CLIENT_ID": request.client_id or get("GOOGLE_CLIENT_ID"),
         "GA4_PROPERTY_ID": request.ga4_property_id,
         "SEARCH_CONSOLE_SITE_URL": request.search_console_site_url,
         "GOOGLE_BUSINESS_LOCATION_NAME": request.business_location_name,
         "GOOGLE_REDIRECT_URI": "http://127.0.0.1:8788/api/oauth/google/callback",
     }
+    if request.client_secret:
+        values["GOOGLE_CLIENT_SECRET"] = request.client_secret
     set_many(values)
     return {
         "ok": True,
@@ -247,16 +249,17 @@ async def discover_google_resources() -> dict[str, Any]:
 
 
 async def save_and_test_meta(request: MetaSetupRequest) -> dict[str, Any]:
-    set_many(
-        {
-            "META_APP_ID": request.app_id,
-            "META_APP_SECRET": request.app_secret,
-            "META_PAGE_ID": request.page_id,
-            "META_PAGE_ACCESS_TOKEN": request.page_access_token,
-            "META_INSTAGRAM_ACCOUNT_ID": request.instagram_account_id,
-            "META_GRAPH_VERSION": request.graph_version or "v26.0",
-        }
-    )
+    values = {
+        "META_APP_ID": request.app_id,
+        "META_PAGE_ID": request.page_id,
+        "META_INSTAGRAM_ACCOUNT_ID": request.instagram_account_id,
+        "META_GRAPH_VERSION": request.graph_version or "v26.0",
+    }
+    if request.app_secret:
+        values["META_APP_SECRET"] = request.app_secret
+    if request.page_access_token:
+        values["META_PAGE_ACCESS_TOKEN"] = request.page_access_token
+    set_many(values)
 
     connector = MetaConnector()
     discovered = await connector.discover_accounts()
