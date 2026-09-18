@@ -75,7 +75,10 @@ function SetupWizardPage({ onFinish }) {
       setStatus(payload)
 
       setAiBaseUrl(payload.ai?.base_url || 'http://127.0.0.1:11434')
-      setAiModel(payload.ai?.selected_model || payload.ai?.models?.[0]?.name || '')
+      const detectedModels = payload.ai?.models || []
+      const configuredModel = payload.ai?.selected_available ? payload.ai?.selected_model : ''
+      const qwenModel = detectedModels.find((item) => String(item.name || '').toLowerCase().includes('qwen'))?.name
+      setAiModel(configuredModel || qwenModel || detectedModels[0]?.name || payload.ai?.selected_model || '')
       setAiThink(Boolean(payload.ai?.think))
 
       setWordpress((prev) => ({
@@ -364,6 +367,11 @@ function SetupWizardPage({ onFinish }) {
                 title="Colleghiamo il tuo WordPress"
                 text="Il sito può essere letto via REST. Per gli eventi GE360 copia la chiave da WordPress → Impostazioni → GE360 Tracker."
               />
+              <ol className="wizard-numbered">
+                <li><strong>Apri WordPress</strong><span>Vai su Impostazioni → GE360 Tracker.</span></li>
+                <li><strong>Copia la chiave sincronizzazione</strong><span>Non è la password WordPress: serve solo a GE360 per leggere gli eventi del tracker.</span></li>
+                <li><strong>Incollala qui e premi Salva e testa</strong><span>GE360 controllerà sito, pagine, articoli e tracker.</span></li>
+              </ol>
               <Field label="URL sito">
                 <input value={wordpress.base_url} onChange={(e) => setWordpress({ ...wordpress, base_url: e.target.value })} />
               </Field>
@@ -397,12 +405,18 @@ function SetupWizardPage({ onFinish }) {
                 text="Inserisci una volta Client ID e Client Secret. Dopo il login GE360 prova a trovarti automaticamente proprietà, siti e sedi."
               />
               <div className="wizard-help-card">
-                <div><Building2 size={18} /><strong>Prima volta?</strong></div>
-                <p>Crea un client OAuth Web nel tuo progetto Google Cloud, abilita le API Analytics Data/Admin, Search Console e Business Profile e usa come redirect:</p>
+                <div><Building2 size={18} /><strong>Prima volta? Segui questi passaggi</strong></div>
+                <ol className="wizard-numbered compact">
+                  <li><strong>Apri Google Cloud</strong><span>Usa o crea un progetto dedicato a GE360.</span></li>
+                  <li><strong>Abilita le API</strong><span>Analytics Data/Admin, Search Console e Business Profile.</span></li>
+                  <li><strong>Crea credenziali OAuth → Applicazione Web</strong><span>Copia Client ID e Client Secret.</span></li>
+                  <li><strong>Aggiungi questo URI di reindirizzamento</strong><span>Deve essere identico a quello mostrato sotto.</span></li>
+                </ol>
                 <code>http://127.0.0.1:8788/api/oauth/google/callback</code>
                 <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noreferrer">
                   Apri Google Cloud Credentials <ExternalLink size={13} />
                 </a>
+                <p>Nota: Google Business Profile può richiedere che il progetto abbia accesso alle Business Profile APIs. Se non compare una sede, Analytics e Search Console possono comunque funzionare.</p>
               </div>
               <Field label="Google Client ID">
                 <input value={google.client_id} onChange={(e) => setGoogle({ ...google, client_id: e.target.value })} />
@@ -488,6 +502,12 @@ function SetupWizardPage({ onFinish }) {
                 title="Facebook e Instagram insieme"
                 text="GE360 usa la Meta Graph API. Con Facebook Login, Instagram deve essere un account professionale collegato alla Pagina Facebook."
               />
+              <ol className="wizard-numbered">
+                <li><strong>Controlla Instagram</strong><span>L'account deve essere Business o Creator, non personale.</span></li>
+                <li><strong>Collegalo alla Pagina Facebook</strong><span>Verifica il collegamento in Meta Business Suite / impostazioni della Pagina.</span></li>
+                <li><strong>Apri Meta for Developers</strong><span>Crea o seleziona l'app che userai per GE360.</span></li>
+                <li><strong>Ottieni Page ID e Page Access Token</strong><span>Incollali qui. GE360 proverà a trovare da solo l'Instagram Business Account ID.</span></li>
+              </ol>
               <div className="social-guide-grid">
                 <div><Share2 size={18} /><strong>Facebook</strong><span>Pagina professionale + Page Access Token</span></div>
                 <div><Camera size={18} /><strong>Instagram</strong><span>Business/Creator collegato alla Pagina</span></div>
