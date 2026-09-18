@@ -17,11 +17,23 @@ jobs:
         run: pip install -r backend/requirements.txt
       - name: Compile backend
         run: python -m compileall -q backend/app
-      - name: Compile agent bridge
-        run: python -m compileall -q agent_bridge
       - name: Import FastAPI app
         working-directory: backend
         run: python -c "from app.main import app; print(app.title)"
+
+  mcp:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install MCP server
+        run: pip install -r mcp_server/requirements.txt
+      - name: Compile MCP server
+        run: python -m compileall -q mcp_server
+      - name: Import MCP server
+        run: python -c "from mcp_server.server import mcp; print('GE360 MCP ready')"
 
   frontend:
     runs-on: ubuntu-latest
