@@ -1,0 +1,34 @@
+name: Package WordPress Tracker
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "wordpress-plugin/ge360-tracker/**"
+      - ".github/workflows/package-wordpress.yml"
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate PHP
+        run: php -l wordpress-plugin/ge360-tracker/ge360-tracker.php
+
+      - name: Validate JavaScript
+        run: node --check wordpress-plugin/ge360-tracker/tracker.js
+
+      - name: Build plugin ZIP
+        run: |
+          mkdir -p dist
+          cd wordpress-plugin
+          zip -r ../dist/ge360-tracker.zip ge360-tracker
+
+      - name: Upload plugin
+        uses: actions/upload-artifact@v4
+        with:
+          name: ge360-tracker
+          path: dist/ge360-tracker.zip
+          retention-days: 30
