@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import LocalAIPage from './LocalAIPage'
 import {
   Activity,
   BarChart3,
@@ -49,7 +50,7 @@ const nav = [
   { id: 'leads', label: 'Lead', icon: Target },
   { id: 'seo', label: 'SEO locale', icon: Search },
   { id: 'connectors', label: 'Connettori', icon: Link2 },
-  { id: 'chatgpt', label: 'ChatGPT', icon: MessageCircle },
+  { id: 'local-ai', label: 'AI Locale', icon: Sparkles },
 ]
 
 const formatNumber = (value) =>
@@ -69,7 +70,6 @@ function App() {
   const [contentPerformance, setContentPerformance] = useState([])
   const [seoRows, setSeoRows] = useState([])
   const [anomalyRows, setAnomalyRows] = useState([])
-  const [chatgptInfo, setChatgptInfo] = useState(null)
   const [loading, setLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
   const [actionMessage, setActionMessage] = useState('')
@@ -89,7 +89,6 @@ function App() {
         fetch(`/api/analytics/content-performance?days=${Math.min(days, 365)}&limit=50`).then((r) => r.json()),
         fetch(`/api/analytics/local-seo?days=${Math.min(days, 365)}&contains=trieste&limit=100`).then((r) => r.json()),
         fetch(`/api/analytics/anomalies?days=${Math.min(days, 30)}&threshold_percent=25&limit=30`).then((r) => r.json()),
-        fetch('/api/integrations/chatgpt').then((r) => r.json()),
       ])
 
       const [
@@ -101,7 +100,6 @@ function App() {
         contentData,
         seoData,
         anomalyData,
-        chatData,
       ] = responses
 
       setData(dashboard)
@@ -112,7 +110,6 @@ function App() {
       setContentPerformance(Array.isArray(contentData) ? contentData : [])
       setSeoRows(Array.isArray(seoData) ? seoData : [])
       setAnomalyRows(Array.isArray(anomalyData) ? anomalyData : [])
-      setChatgptInfo(chatData)
     } finally {
       setLoading(false)
     }
@@ -230,11 +227,11 @@ function App() {
           <SourceStatus icon={Search} label="Search Console" status={connectors.find((c) => c.provider === 'search_console')?.status} />
         </div>
 
-        <button className="sidebar-card sidebar-card-button" onClick={() => navigate('chatgpt')}>
+        <button className="sidebar-card sidebar-card-button" onClick={() => navigate('local-ai')}>
           <Sparkles size={18} />
-          <strong>GE360 + ChatGPT</strong>
-          <p>ChatGPT vero, senza API: usa GE360 come fonte dati tramite MCP.</p>
-          <span>Apri configurazione →</span>
+          <strong>GE360 Intelligence</strong>
+          <p>Ollama + Qwen analizzano i dati direttamente sul tuo Linux.</p>
+          <span>Configura AI locale →</span>
         </button>
       </aside>
 
@@ -260,7 +257,7 @@ function App() {
           </div>
         </header>
 
-        {activeView !== 'chatgpt' && activeView !== 'connectors' && (
+        {activeView !== 'local-ai' && activeView !== 'connectors' && (
           <PeriodBar period={period} setPeriod={setPeriod} />
         )}
 
@@ -295,7 +292,7 @@ function App() {
             actionMessage={actionMessage}
           />
         )}
-        {activeView === 'chatgpt' && <ChatGPTPage info={chatgptInfo} />}
+        {activeView === 'local-ai' && <LocalAIPage days={days} dashboardMode={data?.mode} />}
       </main>
     </div>
   )
@@ -336,8 +333,8 @@ function OverviewPage({
           <h2>Capisci cosa porta davvero nuovi clienti.</h2>
           <p>Social, Google, sito, SEO e lead letti come un unico percorso invece che come dashboard separate.</p>
         </div>
-        <button className="hero-action" onClick={() => navigate('chatgpt')}>
-          <MessageCircle size={17} /> Analizza con ChatGPT
+        <button className="hero-action" onClick={() => navigate('local-ai')}>
+          <Sparkles size={17} /> Analizza con AI Locale
         </button>
       </section>
 
@@ -604,70 +601,6 @@ function ConnectorsPage({
         </button>
         {actionMessage && <span className="inline-message">{actionMessage}</span>}
       </div>
-    </>
-  )
-}
-
-function ChatGPTPage({ info }) {
-  const bundled = info?.plugin_bundled
-  return (
-    <>
-      <PageIntro
-        icon={MessageCircle}
-        kicker="CHATGPT"
-        title="ChatGPT vero, collegato ai dati GE360"
-        text="Non è un modello imitato dentro questa dashboard: usi la normale ChatGPT e il plugin GE360 le permette di leggere i tuoi analytics."
-      />
-      <section className="chatgpt-layout">
-        <article className="panel chatgpt-hero-card">
-          <div className="chatgpt-orb"><Sparkles size={28} /></div>
-          <div>
-            <span className="eyebrow">STATO INTEGRAZIONE</span>
-            <h2>{bundled ? 'Plugin GE360 incluso' : 'Plugin GE360 non rilevato'}</h2>
-            <p>{info?.note || 'GE360 usa ChatGPT Desktop tramite MCP, senza API key OpenAI.'}</p>
-          </div>
-          <div className={`integration-state ${bundled ? 'ok' : ''}`}>
-            {bundled ? <CircleCheck size={18} /> : <CircleAlert size={18} />}
-            {bundled ? 'Pronto da configurare' : 'Da verificare'}
-          </div>
-        </article>
-
-        <section className="two-column-grid">
-          <article className="panel">
-            <PanelHeader eyebrow="1 · PREPARA" title="Configura il runtime MCP" />
-            <p className="panel-copy">Apri un terminale una sola volta con il tuo utente Linux e lancia:</p>
-            <CommandBox command={info?.setup_command || 'ge360-chatgpt-setup'} />
-            <p className="panel-copy subtle">Questo prepara il collegamento locale; non crea una API key OpenAI.</p>
-          </article>
-
-          <article className="panel">
-            <PanelHeader eyebrow="2 · CHATGPT DESKTOP" title="Aggiungi GE360 come plugin locale" />
-            <p className="panel-copy">Il plugin è già installato nel pacchetto Linux qui:</p>
-            <CommandBox command={info?.plugin_path || '/opt/ge360-analitica/chatgpt-plugin'} />
-            <p className="panel-copy subtle">Nell’app ChatGPT Desktop importa questa cartella come plugin locale/MCP.</p>
-          </article>
-        </section>
-
-        <article className="panel chatgpt-examples">
-          <PanelHeader eyebrow="3 · USA CHATGPT" title="Poi parli normalmente" />
-          <div className="prompt-grid">
-            <button onClick={() => window.open(info?.chatgpt_url || 'https://chatgpt.com/', '_blank')}>
-              <MessageCircle size={18} /><span><strong>Apri ChatGPT</strong><small>Usa la normale chat</small></span><ExternalLink size={15} />
-            </button>
-            <div className="example-prompt">“@GE360 quali pagine hanno visite ma pochi lead?”</div>
-            <div className="example-prompt">“@GE360 confronta gli ultimi 30 giorni con il periodo precedente.”</div>
-            <div className="example-prompt">“@GE360 dimmi cosa sta funzionando meglio a Trieste.”</div>
-          </div>
-        </article>
-
-        <div className="important-note">
-          <CircleAlert size={18} />
-          <div>
-            <strong>Perché non vedi una chat incorporata qui?</strong>
-            <p>Per avere ChatGPT autentica senza usare API, la conversazione deve restare nell’app ChatGPT. GE360 le fornisce i dati tramite MCP.</p>
-          </div>
-        </div>
-      </section>
     </>
   )
 }
