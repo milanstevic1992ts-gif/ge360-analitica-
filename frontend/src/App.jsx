@@ -55,7 +55,10 @@ function App() {
   const [period, setPeriod] = useState('30d')
   const [data, setData] = useState(null)
   const [connectors, setConnectors] = useState([])
+  const [diagnostics, setDiagnostics] = useState([])
   const [loading, setLoading] = useState(true)
+  const [syncing, setSyncing] = useState(false)
+  const [actionMessage, setActionMessage] = useState('')
   const [menuOpen, setMenuOpen] = useState(false)
 
   useEffect(() => {
@@ -63,13 +66,48 @@ function App() {
     Promise.all([
       fetch(`/api/dashboard?period=${period}`).then((r) => r.json()),
       fetch('/api/connectors').then((r) => r.json()),
+      fetch('/api/connectors/diagnostics').then((r) => r.json()),
     ])
-      .then(([dashboard, connectorData]) => {
+      .then(([dashboard, connectorData, diagnosticData]) => {
         setData(dashboard)
         setConnectors(connectorData.items || [])
+        setDiagnostics(diagnosticData.items || [])
       })
       .finally(() => setLoading(false))
   }, [period])
+
+  const connectGoogle = async () => {
+    setActionMessage('')
+    const response = await fetch('/api/oauth/google/start')
+    const payload = await response.json()
+    if (!response.ok) {
+      setActionMessage(payload.detail || 'Configurazione Google incompleta')
+      return
+    }
+    window.location.href = payload.authorization_url
+  }
+
+  const syncAll = async () => {
+    setSyncing(true)
+    setActionMessage('')
+    try {
+      const response = await fetch('/api/sync', { method: 'POST' })
+      const payload = await response.json()
+      if (!response.ok) throw new Error(payload.detail || 'Sincronizzazione fallita')
+      const ok = payload.results?.filter((item) => item.ok).length || 0
+      setActionMessage(`Sincronizzazione completata: ${ok} connettori attivi.`)
+      const connectorData = await fetch('/api/connectors').then((r) => r.json())
+      setConnectors(connectorData.items || [])
+    } catch (error) {
+      setActionMessage(error.message)
+    } finally {
+      setSyncing(false)
+    }
+  }
+
+  const googleConfigured = diagnostics.some(
+    (item) => ['ga4', 'search_console', 'google_business'].includes(item.provider) && item.configured
+  )
 
   const conversionRate = useMemo(() => {
     if (!data?.funnel?.length) return 0
@@ -289,13 +327,31 @@ function App() {
             <h3>Collega le fonti reali</h3>
             <p>La struttura è pronta: quando inseriamo le credenziali, i dati demo vengono sostituiti dai tuoi dati.</p>
           </div>
-          <div className="connector-mini-grid">
-            {connectors.map((connector) => (
-              <div className="connector-mini" key={connector.provider}>
-                <span className="status-dot" />
-                <div><strong>{prettyProvider(connector.provider)}</strong><small>Da configurare</small></div>
-              </div>
-            ))}
+          <div className="connector-actions">
+            <div className="connector-mini-grid">
+              {connectors.map((connector) => {
+                const diag = diagnostics.find((item) => item.provider === connector.provider)
+                const ready = connector.status === 'connected' || diag?.configured
+                return (
+                  <div className="connector-mini" key={connector.provider}>
+                    <span className={`status-dot ${ready ? 'ready' : ''}`} />
+                    <div>
+                      <strong>{prettyProvider(connector.provider)}</strong>
+                      <small>{connector.status === 'connected' ? 'Sincronizzato' : ready ? 'Pronto' : 'Da configurare'}</small>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+            <div className="connector-buttons">
+              <button className="primary-action" onClick={connectGoogle}>
+                {googleConfigured ? 'Ricollega Google' : 'Collega Google'}
+              </button>
+              <button className="secondary-action" onClick={syncAll} disabled={syncing}>
+                {syncing ? 'Sincronizzo…' : 'Sincronizza tutto'}
+              </button>
+            </div>
+            {actionMessage && <p className="action-message">{actionMessage}</p>}
           </div>
         </section>
       </main>
