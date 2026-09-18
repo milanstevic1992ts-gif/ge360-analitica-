@@ -122,8 +122,8 @@ function App() {
         <div className="sidebar-card">
           <Sparkles size={18} />
           <strong>GE360 Intelligence</strong>
-          <p>Gli insight AI useranno Codex CLI collegato al tuo account ChatGPT.</p>
-          <span>ChatGPT Agent · CLI</span>
+          <p>Gli insight avanzati saranno disponibili parlando direttamente con ChatGPT tramite il plugin GE360.</p>
+          <span>ChatGPT · Plugin MCP</span>
         </div>
       </aside>
 
