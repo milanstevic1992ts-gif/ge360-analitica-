@@ -3,6 +3,7 @@ from dataclasses import dataclass
 
 from .ga4 import GA4Connector
 from .google_business import GoogleBusinessConnector
+from .meta import MetaConnector
 from .search_console import SearchConsoleConnector
 from .wordpress import WordPressConnector
 
@@ -20,6 +21,7 @@ def diagnostics() -> list[ConnectorDiagnostic]:
     ga4 = GA4Connector()
     search_console = SearchConsoleConnector()
     google_business = GoogleBusinessConnector()
+    meta = MetaConnector()
 
     return [
         ConnectorDiagnostic(
@@ -30,8 +32,8 @@ def diagnostics() -> list[ConnectorDiagnostic]:
         ),
         ConnectorDiagnostic(
             provider="meta",
-            configured=bool(os.getenv("META_PAGE_ACCESS_TOKEN") and os.getenv("META_PAGE_ID")),
-            implementation="scaffold",
+            configured=meta.configured(),
+            implementation="active",
             required_env=["META_PAGE_ACCESS_TOKEN", "META_PAGE_ID"],
         ),
         ConnectorDiagnostic(
