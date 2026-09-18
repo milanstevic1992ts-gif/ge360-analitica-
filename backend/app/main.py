@@ -1,6 +1,8 @@
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
+from .connectors.registry import diagnostics
+from .connectors.wordpress import WordPressConnector
 from .db import connector_states, initialize
 from .demo_data import dashboard
 
@@ -37,6 +39,27 @@ def get_dashboard(period: str = Query("30d", pattern="^(7d|30d|90d|365d)$")) -> 
 @app.get("/api/connectors")
 def get_connectors() -> dict:
     return {"items": connector_states()}
+
+
+@app.get("/api/connectors/diagnostics")
+def get_connector_diagnostics() -> dict:
+    return {"items": [item.__dict__ for item in diagnostics()]}
+
+
+@app.post("/api/connectors/wordpress/test")
+async def test_wordpress_connector() -> dict:
+    connector = WordPressConnector()
+    try:
+        result = await connector.sync()
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"WordPress non raggiungibile: {exc}") from exc
+
+    return {
+        "provider": result.provider,
+        "ok": result.ok,
+        "metrics": result.metrics,
+        "message": result.message,
+    }
 
 
 @app.get("/")
