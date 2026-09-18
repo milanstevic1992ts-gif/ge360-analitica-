@@ -126,8 +126,8 @@ jobs:
           # Reinstalla/aggiorna sopra l'installazione esistente.
           sudo dpkg -i dist/ge360-analitica_0.3.0_amd64.deb
 
-          grep "persistent-db-marker" /var/lib/ge360-analitica/upgrade-marker
-          grep "user-setting-must-survive" /etc/ge360-analitica/ge360.env
+          sudo grep "persistent-db-marker" /var/lib/ge360-analitica/upgrade-marker
+          sudo grep "user-setting-must-survive" /etc/ge360-analitica/ge360.env
 
       - name: Upload Linux packages
         uses: actions/upload-artifact@v4
