@@ -35,6 +35,7 @@ class MetaCredentialsRequest(BaseModel):
     app_id: str = Field(default="", max_length=200)
     app_secret: str = Field(default="", max_length=500)
     graph_version: str = Field(default="v26.0", max_length=20)
+    redirect_uri: str = Field(default="", max_length=500)
 
 
 class MetaSetupRequest(BaseModel):
@@ -320,19 +321,36 @@ def save_meta_credentials(request: MetaCredentialsRequest) -> dict[str, Any]:
     }
     if request.app_secret:
         values["META_APP_SECRET"] = request.app_secret
+
+    if request.redirect_uri:
+        redirect = request.redirect_uri.strip()
+        if not (
+            redirect.startswith("https://")
+            or redirect.startswith("http://127.0.0.1")
+            or redirect.startswith("http://localhost")
+        ):
+            raise ValueError("Il callback Meta deve usare HTTPS oppure localhost/127.0.0.1")
+        values["META_REDIRECT_URI"] = redirect
+
     set_many(values)
+    oauth_ready = bool(get("META_APP_ID") and get("META_APP_SECRET"))
     return {
         "ok": True,
         "sdk_ready": bool(get("META_APP_ID")),
-        "oauth_ready": bool(get("META_APP_ID") and get("META_APP_SECRET")),
+        "oauth_ready": oauth_ready,
+        "login_mode": "server_oauth" if oauth_ready else "javascript_sdk",
         "redirect_uri": get(
             "META_REDIRECT_URI",
             "http://127.0.0.1:8788/api/oauth/meta/callback",
         ),
         "message": (
-            "Meta App ID salvato. Ora puoi usare Accedi con Facebook."
-            if get("META_APP_ID")
-            else "Inserisci il Meta App ID."
+            "Meta OAuth server pronto. Ora premi Accedi con Facebook."
+            if oauth_ready
+            else (
+                "Meta App ID salvato. Login JavaScript disponibile."
+                if get("META_APP_ID")
+                else "Inserisci il Meta App ID."
+            )
         ),
     }
 
