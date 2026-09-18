@@ -195,6 +195,30 @@ def persist_result(result: Any) -> dict[str, int]:
 
     with connect() as conn:
         for metric in result.metrics:
+            captured_at = metric.get("captured_at") or now
+            dimension = metric.get("dimension")
+            dimension_value = metric.get("dimension_value")
+
+            # I provider Google risincronizzano finestre storiche: sostituiamo
+            # lo stesso datapoint invece di sommarlo più volte.
+            conn.execute(
+                """
+                DELETE FROM metric_snapshots
+                WHERE provider = ?
+                  AND metric = ?
+                  AND COALESCE(dimension, '') = ?
+                  AND COALESCE(dimension_value, '') = ?
+                  AND captured_at = ?
+                """,
+                (
+                    result.provider,
+                    metric["metric"],
+                    dimension or "",
+                    dimension_value or "",
+                    captured_at,
+                ),
+            )
+
             conn.execute(
                 """
                 INSERT INTO metric_snapshots(
@@ -205,9 +229,9 @@ def persist_result(result: Any) -> dict[str, int]:
                     result.provider,
                     metric["metric"],
                     float(metric.get("value", 0)),
-                    metric.get("dimension"),
-                    metric.get("dimension_value"),
-                    metric.get("captured_at") or now,
+                    dimension,
+                    dimension_value,
+                    captured_at,
                 ),
             )
             counts["metrics"] += 1
