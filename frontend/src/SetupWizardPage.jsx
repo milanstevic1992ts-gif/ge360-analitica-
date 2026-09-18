@@ -484,9 +484,16 @@ function SetupWizardPage({ onFinish }) {
       return
     }
 
-    // Se App Secret è disponibile usiamo il normale OAuth server-side:
-    // è più robusto del JS SDK e non dipende dalla pagina locale aperta in HTTPS.
+    // Con App Secret usiamo Facebook Login for Business. In questo flusso
+    // Meta vuole una Configuration ID; i permessi non vanno passati come scope.
     if (status?.meta?.META_APP_SECRET?.configured) {
+      if (!status?.meta?.META_BUSINESS_LOGIN_CONFIG_ID?.configured) {
+        setMessage(
+          'Manca la Configuration ID. In Meta apri Facebook Login for Business → Configurations, creane una e incolla qui il suo ID.'
+        )
+        return
+      }
+
       setBusy('meta-login')
       try {
         const response = await fetch('/api/oauth/meta/start')
@@ -898,7 +905,7 @@ function SetupWizardPage({ onFinish }) {
                 </button>
               </div>
 
-              {facebookSdkError && (
+              {facebookSdkError && !status?.meta?.META_APP_SECRET?.configured && (
                 <div className="wizard-help-card">
                   <div><CircleAlert size={15} /><strong>Facebook Login non è pronto</strong></div>
                   <p>{facebookSdkError}</p>
