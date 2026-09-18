@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import analytics, google_oauth, local_ai
+from . import analytics, google_oauth, local_ai, setup_wizard
 from .background import auto_sync_enabled, periodic_sync
 from .connectors.registry import diagnostics
 from .connectors.wordpress import WordPressConnector
@@ -17,7 +17,7 @@ from .sync import sync_all, sync_provider
 
 app = FastAPI(
     title="GE360 Analitica API",
-    version="0.3.0",
+    version="0.4.0",
     description="API centrale per analytics, attribuzione e connettori GE360.",
 )
 
@@ -55,7 +55,7 @@ async def shutdown() -> None:
 
 @app.get("/api/health")
 def health() -> dict:
-    return {"status": "ok", "service": "ge360-analitica", "version": "0.3.0"}
+    return {"status": "ok", "service": "ge360-analitica", "version": "0.4.0"}
 
 
 @app.get("/api/dashboard")
@@ -205,6 +205,40 @@ def analytics_local_seo(
     return analytics.local_seo(days=days, contains=contains, limit=limit)
 
 
+@app.get("/api/setup/status")
+async def setup_status() -> dict:
+    return await setup_wizard.status()
+
+
+@app.post("/api/setup/wordpress")
+async def setup_wordpress(request: setup_wizard.WordPressSetupRequest) -> dict:
+    try:
+        return await setup_wizard.save_and_test_wordpress(request)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Test WordPress fallito: {exc}") from exc
+
+
+@app.post("/api/setup/google")
+def setup_google(request: setup_wizard.GoogleSetupRequest) -> dict:
+    return setup_wizard.save_google(request)
+
+
+@app.get("/api/setup/google/discover")
+async def setup_google_discover() -> dict:
+    try:
+        return await setup_wizard.discover_google_resources()
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Scoperta Google fallita: {exc}") from exc
+
+
+@app.post("/api/setup/meta")
+async def setup_meta(request: setup_wizard.MetaSetupRequest) -> dict:
+    try:
+        return await setup_wizard.save_and_test_meta(request)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Test Meta fallito: {exc}") from exc
+
+
 @app.get("/api/local-ai/status")
 async def local_ai_status() -> dict:
     return await local_ai.status()
@@ -256,7 +290,7 @@ def root() -> dict:
         "status": "running",
         "docs": "/docs",
         "health": "/api/health",
-        "chatgpt_integration": "MCP plugin",
+        "local_ai": "Ollama/Qwen",
     }
 
 
