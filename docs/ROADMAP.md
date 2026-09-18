@@ -61,15 +61,19 @@ Percorso:
 source -> campaign/content -> landing page -> action -> lead
 ```
 
-## Fase 5 — AI locale
-- [ ] Ollama
-- [ ] Qwen
+## Fase 5 — ChatGPT Agent via CLI
+- [x] architettura Agent Bridge host-side
+- [x] Codex CLI in sandbox read-only
+- [x] comunicazione via Unix socket
+- [ ] pannello chat GE360 Intelligence
 - [ ] briefing automatico
 - [ ] domande in linguaggio naturale
 - [ ] "cosa è migliorato?"
 - [ ] "cosa è peggiorato?"
 - [ ] "quale contenuto dovrei rifare?"
 - [ ] spiegazione basata sempre sui dati e non su supposizioni
+- [ ] sessioni / cronologia analisi
+- [ ] fallback locale opzionale solo se utile
 
 ## Fase 6 — Operatività
 - [ ] scheduler sync
