@@ -1,7 +1,8 @@
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
 
-from . import analytics
+from . import analytics, google_oauth
 from .connectors.registry import diagnostics
 from .connectors.wordpress import WordPressConnector
 from .db import connector_states, initialize
@@ -62,6 +63,30 @@ async def test_wordpress_connector() -> dict:
         "metrics": result.metrics,
         "message": result.message,
     }
+
+
+@app.get("/api/oauth/google/start")
+def google_oauth_start() -> dict:
+    try:
+        return {"authorization_url": google_oauth.authorization_url()}
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/api/oauth/google/callback")
+async def google_oauth_callback(code: str, state: str):
+    try:
+        await google_oauth.exchange_code(code, state)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"OAuth Google fallito: {exc}") from exc
+
+    return RedirectResponse("http://127.0.0.1:8788/?google=connected", status_code=302)
+
+
+@app.post("/api/oauth/google/disconnect")
+def google_oauth_disconnect() -> dict:
+    google_oauth.disconnect()
+    return {"ok": True}
 
 
 @app.post("/api/sync")
