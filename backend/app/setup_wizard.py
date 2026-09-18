@@ -19,6 +19,10 @@ class WordPressSetupRequest(BaseModel):
     ge360_key: str = Field(default="", max_length=500)
 
 
+class GoogleOAuthJsonRequest(BaseModel):
+    payload: dict[str, Any]
+
+
 class GoogleSetupRequest(BaseModel):
     client_id: str = Field(default="", max_length=500)
     client_secret: str = Field(default="", max_length=500)
@@ -94,6 +98,7 @@ async def status() -> dict[str, Any]:
                 "META_PAGE_ACCESS_TOKEN",
                 "META_INSTAGRAM_ACCOUNT_ID",
                 "META_GRAPH_VERSION",
+                "META_USER_ACCESS_TOKEN",
             ]
         ),
     }
@@ -119,6 +124,44 @@ async def save_and_test_wordpress(request: WordPressSetupRequest) -> dict[str, A
         "message": result.message,
         "tracker_configured": bool(get("WORDPRESS_GE360_KEY")),
         "metrics": result.metrics,
+    }
+
+
+def import_google_oauth_json(request: GoogleOAuthJsonRequest) -> dict[str, Any]:
+    payload = request.payload or {}
+    block = payload.get("web") or payload.get("installed")
+    if not isinstance(block, dict):
+        raise ValueError("File OAuth Google non riconosciuto: manca la sezione web/installed")
+
+    client_id = str(block.get("client_id") or "").strip()
+    client_secret = str(block.get("client_secret") or "").strip()
+    if not client_id or not client_secret:
+        raise ValueError("Il file OAuth non contiene client_id/client_secret")
+
+    set_many(
+        {
+            "GOOGLE_CLIENT_ID": client_id,
+            "GOOGLE_CLIENT_SECRET": client_secret,
+            "GOOGLE_REDIRECT_URI": "http://127.0.0.1:8788/api/oauth/google/callback",
+        }
+    )
+
+    redirect_uris = block.get("redirect_uris") or []
+    redirect_ready = (
+        "http://127.0.0.1:8788/api/oauth/google/callback" in redirect_uris
+        or "http://localhost:8788/api/oauth/google/callback" in redirect_uris
+    )
+
+    return {
+        "ok": True,
+        "client_type": "web" if payload.get("web") else "installed",
+        "redirect_ready": redirect_ready,
+        "redirect_uri": "http://127.0.0.1:8788/api/oauth/google/callback",
+        "message": (
+            "Credenziali Google importate. Ora premi Accedi con Google."
+            if redirect_ready
+            else "Credenziali importate. Verifica che il redirect GE360 sia autorizzato nel client OAuth."
+        ),
     }
 
 
