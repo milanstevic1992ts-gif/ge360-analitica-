@@ -134,12 +134,17 @@ jobs:
           sudo mkdir -p /var/lib/ge360-analitica
           echo "persistent-db-marker" | sudo tee /var/lib/ge360-analitica/upgrade-marker >/dev/null
           echo "# user-setting-must-survive" | sudo tee -a /etc/ge360-analitica/ge360.env >/dev/null
+          sudo mkdir -p /var/lib/ge360-analitica/secrets
+          echo '{"WIZARD_TEST":"survive-upgrade"}' | sudo tee /var/lib/ge360-analitica/secrets/runtime_config.json >/dev/null
+          sudo chown ge360:ge360 /var/lib/ge360-analitica/secrets/runtime_config.json
+          sudo chmod 600 /var/lib/ge360-analitica/secrets/runtime_config.json
 
           # Reinstalla/aggiorna sopra l'installazione esistente.
           sudo dpkg -i dist/ge360-analitica_0.4.0_amd64.deb
 
           sudo grep "persistent-db-marker" /var/lib/ge360-analitica/upgrade-marker
           sudo grep "user-setting-must-survive" /etc/ge360-analitica/ge360.env
+          sudo grep "survive-upgrade" /var/lib/ge360-analitica/secrets/runtime_config.json
 
       - name: Upload Linux packages
         uses: actions/upload-artifact@v4
