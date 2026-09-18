@@ -64,8 +64,10 @@ const formatMoney = (value) =>
 
 function App() {
   const [activeView, setActiveView] = useState(() => {
-    const googleReturned = new URLSearchParams(window.location.search).get('google') === 'connected'
-    if (googleReturned) return 'setup'
+    const callbackParams = new URLSearchParams(window.location.search)
+    const oauthReturned =
+      callbackParams.get('google') === 'connected' || callbackParams.get('meta') === 'connected'
+    if (oauthReturned) return 'setup'
     return localStorage.getItem('ge360-setup-seen') ? 'overview' : 'setup'
   })
   const [period, setPeriod] = useState('30d')
