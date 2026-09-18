@@ -1,6 +1,9 @@
 import os
 from dataclasses import dataclass
 
+from .ga4 import GA4Connector
+from .google_business import GoogleBusinessConnector
+from .search_console import SearchConsoleConnector
 from .wordpress import WordPressConnector
 
 
@@ -14,6 +17,9 @@ class ConnectorDiagnostic:
 
 def diagnostics() -> list[ConnectorDiagnostic]:
     wordpress = WordPressConnector()
+    ga4 = GA4Connector()
+    search_console = SearchConsoleConnector()
+    google_business = GoogleBusinessConnector()
 
     return [
         ConnectorDiagnostic(
@@ -30,20 +36,35 @@ def diagnostics() -> list[ConnectorDiagnostic]:
         ),
         ConnectorDiagnostic(
             provider="google_business",
-            configured=bool(os.getenv("GOOGLE_CLIENT_ID") and os.getenv("GOOGLE_CLIENT_SECRET")),
-            implementation="scaffold",
-            required_env=["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_BUSINESS_ACCOUNT_ID"],
+            configured=google_business.configured(),
+            implementation="active",
+            required_env=[
+                "GOOGLE_CLIENT_ID",
+                "GOOGLE_CLIENT_SECRET",
+                "GOOGLE_REFRESH_TOKEN",
+                "GOOGLE_BUSINESS_LOCATION_NAME",
+            ],
         ),
         ConnectorDiagnostic(
             provider="ga4",
-            configured=bool(os.getenv("GA4_PROPERTY_ID") and os.getenv("GOOGLE_CLIENT_ID")),
-            implementation="scaffold",
-            required_env=["GA4_PROPERTY_ID", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"],
+            configured=ga4.configured(),
+            implementation="active",
+            required_env=[
+                "GOOGLE_CLIENT_ID",
+                "GOOGLE_CLIENT_SECRET",
+                "GOOGLE_REFRESH_TOKEN",
+                "GA4_PROPERTY_ID",
+            ],
         ),
         ConnectorDiagnostic(
             provider="search_console",
-            configured=bool(os.getenv("SEARCH_CONSOLE_SITE_URL") and os.getenv("GOOGLE_CLIENT_ID")),
-            implementation="scaffold",
-            required_env=["SEARCH_CONSOLE_SITE_URL", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"],
+            configured=search_console.configured(),
+            implementation="active",
+            required_env=[
+                "GOOGLE_CLIENT_ID",
+                "GOOGLE_CLIENT_SECRET",
+                "GOOGLE_REFRESH_TOKEN",
+                "SEARCH_CONSOLE_SITE_URL",
+            ],
         ),
     ]
