@@ -733,3 +733,94 @@ button { cursor: pointer; }
 .wizard-numbered.compact { margin:9px 0;gap:5px; }
 .wizard-numbered.compact li { padding-top:7px;padding-bottom:7px; }
 .wizard-numbered.compact li::before { top:7px; }
+
+
+/* Login-first setup */
+.login-card {
+  display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:14px;
+  padding:16px;margin-bottom:14px;border:1px solid rgba(101,127,255,.16);
+  border-radius:14px;background:linear-gradient(120deg,rgba(101,127,255,.07),rgba(255,255,255,.012));
+}
+.login-card.connected {
+  border-color:rgba(40,215,163,.18);
+  background:linear-gradient(120deg,rgba(40,215,163,.055),rgba(101,127,255,.035));
+}
+.login-card-icon {
+  width:46px;height:46px;border-radius:13px;display:grid;place-items:center;
+  background:rgba(101,127,255,.10);color:#91a2ff;
+}
+.login-card.connected .login-card-icon { background:rgba(40,215,163,.09);color:#4bddaf; }
+.login-card strong { display:block;font-size:12px; }
+.login-card p { margin:4px 0 0;color:#69778d;font-size:8px;line-height:1.45; }
+.login-action { display:flex;align-items:center;gap:6px;white-space:nowrap; }
+
+.one-time-setup {
+  margin:12px 0 14px;padding:14px;border:1px solid rgba(245,184,90,.14);
+  border-radius:12px;background:rgba(245,184,90,.028);
+}
+.one-time-heading { display:flex;align-items:flex-start;gap:9px;color:#e4b45e; }
+.one-time-heading strong { display:block;color:#dce5f5;font-size:9px; }
+.one-time-heading span { display:block;margin-top:3px;color:#7f725d;font-size:8px; }
+.one-time-setup > p { color:#756b59;font-size:8px;line-height:1.5;margin:10px 0; }
+.one-time-setup > code {
+  display:block;padding:9px 10px;border-radius:8px;background:#09111e;color:#bec9db;
+  font-size:8px;overflow-wrap:anywhere;
+}
+.one-time-actions { display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px; }
+.one-time-actions > a {
+  display:flex;align-items:center;gap:5px;color:#91a2ff;font-size:8px;text-decoration:none;
+}
+.file-action { position:relative;overflow:hidden;display:flex;align-items:center;gap:6px;cursor:pointer; }
+.file-action input { position:absolute;inset:0;opacity:0;cursor:pointer; }
+
+.advanced-box {
+  margin:10px 0 14px;border:1px solid rgba(148,163,184,.08);border-radius:11px;
+  background:rgba(255,255,255,.012);overflow:hidden;
+}
+.advanced-box summary {
+  cursor:pointer;padding:11px 12px;color:#77869c;font-size:8px;font-weight:700;
+  user-select:none;
+}
+.advanced-box[open] summary { border-bottom:1px solid rgba(148,163,184,.07);color:#a9b5c7; }
+.advanced-box-body { padding:12px; }
+.meta-onetime-fields { padding:12px 0 0; }
+
+.auto-found-grid {
+  display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:12px 0;
+}
+.found-card {
+  display:flex;align-items:center;gap:8px;padding:10px;border:1px solid var(--border);
+  border-radius:10px;color:#e0b25e;background:rgba(245,184,90,.02);
+}
+.found-card.ok { color:#4bddaf;background:rgba(40,215,163,.02); }
+.found-card strong { display:block;color:#dbe4f3;font-size:8px; }
+.found-card span { display:block;color:#647289;font-size:7px;margin-top:2px; }
+
+.selection-heading { margin-bottom:10px; }
+.selection-heading h4 { margin:4px 0 0;font-size:12px; }
+.page-choice-grid { display:grid;gap:8px;margin-bottom:12px; }
+.page-choice {
+  width:100%;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:10px;text-align:left;
+  padding:12px;border:1px solid var(--border);border-radius:11px;background:rgba(255,255,255,.015);
+  color:#dfe7f6;transition:.16s ease;
+}
+.page-choice:hover { border-color:rgba(101,127,255,.30);background:rgba(101,127,255,.04);transform:translateY(-1px); }
+.page-choice-icon {
+  width:36px;height:36px;border-radius:10px;display:grid;place-items:center;
+  color:#91a2ff;background:rgba(101,127,255,.09);
+}
+.page-choice strong { display:block;font-size:9px; }
+.page-choice small { display:block;color:#617087;font-size:7px;margin-top:2px; }
+.instagram-found,.instagram-missing {
+  margin-top:5px;display:flex;align-items:center;gap:4px;font-size:7px;
+}
+.instagram-found { color:#4bddaf; }
+.instagram-missing { color:#84745d; }
+
+@media (max-width: 720px) {
+  .login-card { grid-template-columns:auto 1fr; }
+  .login-action { grid-column:1 / -1;width:100%;justify-content:center; }
+  .auto-found-grid { grid-template-columns:1fr; }
+  .one-time-actions { flex-direction:column;align-items:stretch; }
+  .one-time-actions > a,.one-time-actions > label { width:100%;justify-content:center; }
+}
