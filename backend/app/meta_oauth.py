@@ -15,6 +15,7 @@ _pending_states: set[str] = set()
 META_SCOPES = [
     "pages_show_list",
     "pages_read_engagement",
+    "read_insights",
     "instagram_basic",
     "instagram_manage_insights",
 ]
