@@ -885,3 +885,117 @@ button { cursor: pointer; }
 @media (max-width: 700px) {
   .social-account-summary { grid-template-columns:1fr; }
 }
+
+/* ---------------------------------------------------------------
+   0.7 — pagine di analisi approfondita
+   --------------------------------------------------------------- */
+.insight-kpis { margin-top:12px; }
+.mini-kpi-hint { display:block; margin-top:5px; color:#5f6d84; font-size:9px; }
+
+.g-table-wrap { width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch; }
+.g-table { width:100%; border-collapse:collapse; font-size:10px; }
+.g-table th {
+  text-align:left; color:#536178; font-size:8px; text-transform:uppercase; letter-spacing:.08em;
+  font-weight:700; padding:0 8px 8px; white-space:nowrap;
+}
+.g-table td {
+  padding:10px 8px; border-top:1px solid rgba(148,163,184,.07); color:#d6deec;
+  max-width:340px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.g-table tbody tr:hover td { background:rgba(101,127,255,.04); }
+.g-table .num { text-align:right; font-variant-numeric:tabular-nums; }
+
+.bar-list { display:grid; gap:11px; }
+.bar-row-text { display:flex; justify-content:space-between; gap:12px; font-size:10px; margin-bottom:5px; }
+.bar-row-text span { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#cfd8e8; }
+.bar-row-text strong { font-variant-numeric:tabular-nums; }
+.bar-row small { display:block; margin-top:4px; color:#5f6d84; font-size:9px; }
+.bar-track { height:6px; border-radius:6px; background:rgba(148,163,184,.08); overflow:hidden; }
+.bar-fill { height:100%; border-radius:6px; background:linear-gradient(90deg,#5f78ef,#8aa0ff); min-width:2px; }
+
+.funnel-steps { display:grid; gap:14px; }
+.funnel-step-text { display:flex; align-items:baseline; gap:10px; margin-bottom:6px; font-size:10px; }
+.funnel-step-text span { color:#aab6ca; }
+.funnel-step-text strong { font-size:15px; font-variant-numeric:tabular-nums; }
+.funnel-step-text small { margin-left:auto; color:#5f6d84; font-size:9px; }
+.funnel-step:last-child .bar-fill { background:linear-gradient(90deg,#1fbf8f,#28d7a3); }
+
+.path-list { margin:0; padding-left:18px; display:grid; gap:8px; font-size:10px; }
+.path-list li { color:#6f7d94; }
+.path-list li span { color:#d6deec; overflow-wrap:anywhere; }
+.path-list li strong { float:right; margin-left:10px; font-variant-numeric:tabular-nums; }
+
+.cannibal-list { display:grid; gap:18px; }
+.cannibal-item { border-top:1px solid rgba(148,163,184,.1); padding-top:14px; }
+.cannibal-item:first-child { border-top:0; padding-top:0; }
+.cannibal-head { display:flex; flex-wrap:wrap; align-items:center; gap:8px 12px; margin-bottom:8px; }
+.cannibal-head strong { font-size:12px; }
+.cannibal-head small { color:#68768d; font-size:9px; }
+
+.rating-pill {
+  display:inline-block; padding:3px 8px; border-radius:20px; font-style:normal; font-size:9px; font-weight:700;
+  border:1px solid var(--border); color:#aab6ca; white-space:nowrap;
+}
+.rating-pill.good { color:#28d7a3; border-color:rgba(40,215,163,.35); background:rgba(40,215,163,.08); }
+.rating-pill.warn { color:#f5b85a; border-color:rgba(245,184,90,.35); background:rgba(245,184,90,.08); }
+.rating-pill.bad { color:#ff7b8c; border-color:rgba(255,123,140,.35); background:rgba(255,123,140,.08); }
+
+.insight-filters { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px; }
+.insight-filters input, .insight-filters select {
+  flex:1 1 220px; min-width:0; padding:9px 11px; border-radius:9px; border:1px solid var(--border);
+  background:rgba(255,255,255,.03); color:var(--text); font-size:11px;
+}
+.insight-filters select { flex:0 1 170px; }
+.insight-filters input:focus-visible, .insight-filters select:focus-visible,
+.link-action:focus-visible { outline:2px solid #8799ff; outline-offset:2px; }
+
+.vital-grid { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:10px; margin:12px 0 6px; }
+.vital-card {
+  border:1px solid var(--border); border-radius:14px; padding:15px; background:var(--panel);
+  display:flex; flex-direction:column; gap:6px; border-top:3px solid rgba(148,163,184,.25);
+}
+.vital-card.good { border-top-color:#28d7a3; }
+.vital-card.warn { border-top-color:#f5b85a; }
+.vital-card.bad { border-top-color:#ff7b8c; }
+.vital-card > span { color:#8491a8; font-size:10px; }
+.vital-card > strong { font-size:22px; letter-spacing:-.02em; font-variant-numeric:tabular-nums; }
+.vital-card .rating-pill { align-self:flex-start; }
+.vital-card small { color:#5f6d84; font-size:9px; line-height:1.45; }
+
+.history-action { display:inline-flex; align-items:center; gap:8px; }
+.link-action {
+  display:inline-flex; align-items:center; gap:4px; border:0; background:none; padding:2px 0;
+  color:#8fa0ff; font-size:10px; font-weight:600;
+}
+.link-action:hover { text-decoration:underline; }
+
+@media (max-width: 1180px) {
+  .vital-grid { grid-template-columns:repeat(3,minmax(0,1fr)); }
+}
+@media (max-width: 650px) {
+  .vital-grid { grid-template-columns:1fr 1fr; }
+  .g-table td { max-width:200px; }
+}
+
+/* Classi usate dalla pagina Meta Analytics e mai definite prima della 0.7 */
+.page-stack { display:grid; gap:12px; }
+.panel-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:15px; margin-bottom:12px; }
+.panel-heading h3 { font-size:14px; margin:5px 0 0; }
+.panel-heading > span { color:#68768d; font-size:9px; }
+.table-wrap { width:100%; overflow-x:auto; }
+.table-wrap table { width:100%; border-collapse:collapse; font-size:10px; }
+.table-wrap th { text-align:left; color:#536178; font-size:8px; text-transform:uppercase; letter-spacing:.08em; padding:0 8px 8px; }
+.table-wrap td { padding:10px 8px; border-top:1px solid rgba(148,163,184,.07); }
+.table-wrap a { color:#8fa0ff; }
+.empty-card { border:1px dashed var(--border); border-radius:14px; padding:18px; color:#7e8ba1; font-size:11px; grid-column:1 / -1; }
+.empty-card p { margin:6px 0 0; font-size:10px; }
+.chip-list { display:flex; flex-wrap:wrap; gap:6px; }
+.chip { padding:5px 9px; border-radius:20px; border:1px solid var(--border); color:#aab6ca; font-size:9px; }
+@media (prefers-reduced-motion: reduce) {
+  .bar-fill { transition:none; }
+}
+
+/* 0.8 — Meta approfondito e Google Business */
+.subhead { margin:0 0 8px; font-size:11px; letter-spacing:.04em; text-transform:uppercase; color:#8a98b0; }
+.g-table td a { color:#9fb1ff; text-decoration:none; }
+.g-table td a:hover { text-decoration:underline; }

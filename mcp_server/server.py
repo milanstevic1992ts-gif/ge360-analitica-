@@ -198,5 +198,104 @@ def ge360_local_seo(
     )
 
 
+@mcp.tool(
+    title="Pubblico",
+    annotations=READ_ONLY,
+)
+def ge360_audience(days: int = 30) -> dict[str, Any]:
+    """Dispositivi, città (quota Trieste), canali, campagne, nuovi/ricorrenti, orari e giorni."""
+    return _get("/api/analytics/audience", {"days": days})
+
+
+@mcp.tool(
+    title="Percorsi verso il contatto",
+    annotations=READ_ONLY,
+)
+def ge360_journeys(days: int = 30, limit: int = 30) -> dict[str, Any]:
+    """Funnel sessioni→contatto, conversione per sorgente/landing/dispositivo, percorsi, abbandono moduli."""
+    return _get("/api/analytics/journeys", {"days": days, "limit": limit})
+
+
+@mcp.tool(
+    title="Query e pagine Google",
+    annotations=READ_ONLY,
+)
+def ge360_search_query_page(
+    days: int = 90,
+    contains: str = "",
+    device: str | None = None,
+    limit: int = 200,
+) -> list[dict[str, Any]]:
+    """Quale pagina compare per quale ricerca Google, con click, impression, CTR e posizione."""
+    params: dict[str, Any] = {"days": days, "contains": contains, "limit": limit}
+    if device:
+        params["device"] = device
+    return _get("/api/analytics/search/query-page", params)
+
+
+@mcp.tool(
+    title="Opportunità Google",
+    annotations=READ_ONLY,
+)
+def ge360_search_opportunities(days: int = 90, min_impressions: int = 30, limit: int = 50) -> list[dict[str, Any]]:
+    """Ricerche vicine alla prima pagina o con CTR basso, con stima dei click recuperabili."""
+    return _get(
+        "/api/analytics/search/opportunities",
+        {"days": days, "min_impressions": min_impressions, "limit": limit},
+    )
+
+
+@mcp.tool(
+    title="Cannibalizzazione SEO",
+    annotations=READ_ONLY,
+)
+def ge360_cannibalization(days: int = 90, min_impressions: int = 20, limit: int = 50) -> list[dict[str, Any]]:
+    """Pagine del sito che si contendono la stessa ricerca, con pagina principale consigliata."""
+    return _get(
+        "/api/analytics/search/cannibalization",
+        {"days": days, "min_impressions": min_impressions, "limit": limit},
+    )
+
+
+@mcp.tool(
+    title="Salute del sito",
+    annotations=READ_ONLY,
+)
+def ge360_site_health(days: int = 30) -> dict[str, Any]:
+    """Core Web Vitals reali, pagine lente, 404, rage click, tempo di lettura e scroll per pagina."""
+    return _get("/api/analytics/site-health", {"days": days})
+
+
+@mcp.tool(
+    title="Copertura storico",
+    annotations=READ_ONLY,
+)
+def ge360_history() -> list[dict[str, Any]]:
+    """Da quando partono i dati di ogni fonte e se lo storico completo è stato scaricato."""
+    return _get("/api/analytics/history")
+
+
+@mcp.tool(
+    title="Meta approfondito",
+    annotations=READ_ONLY,
+)
+def ge360_meta_deep(days: int = 30) -> dict[str, Any]:
+    """Facebook e Instagram nel dettaglio: classifica post e reel con copertura, interazioni e
+    tasso di coinvolgimento, confronto formati, giorni e orari migliori, crescita follower,
+    demografia (città, età, genere), orari online, storie e visite/contatti portati al sito."""
+    return _get("/api/analytics/meta/deep", {"days": days})
+
+
+@mcp.tool(
+    title="Google Business e recensioni",
+    annotations=READ_ONLY,
+)
+def ge360_google_business(days: int = 30) -> dict[str, Any]:
+    """Scheda Google: chiamate, click al sito, indicazioni, impression Maps/Ricerca con confronto
+    sul periodo precedente, keyword mese per mese, recensioni (media, distribuzione, risposte,
+    recensioni senza risposta o negative, parole più citate)."""
+    return _get("/api/analytics/business", {"days": days})
+
+
 if __name__ == "__main__":
     mcp.run(transport="stdio")

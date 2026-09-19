@@ -6,6 +6,7 @@ from typing import Callable
 from .analytics import anomalies, opportunity_radar
 from .db import connect
 from .demo_data import dashboard as demo_dashboard
+from .event_types import CONVERSION_SQL
 
 
 PERIOD_DAYS = {
@@ -138,8 +139,8 @@ def _interactions(start: str, end: str) -> float:
     first_party = _event_count(
         start,
         end,
-        "event_type != ?",
-        ("page_view",),
+        f"event_type IN {CONVERSION_SQL}",
+        (),
     )
     meta = _metric_sum(
         ["meta_page_post_engagements"],
@@ -176,11 +177,11 @@ def _trend(days: int, start: str, end: str) -> list[dict]:
         ).fetchall()
 
         interaction_rows = conn.execute(
-            """
+            f"""
             SELECT DATE(occurred_at) AS day, COUNT(*) AS value
             FROM events
             WHERE occurred_at >= ? AND occurred_at < ?
-              AND event_type != 'page_view'
+              AND event_type IN {CONVERSION_SQL}
             GROUP BY DATE(occurred_at)
             """,
             (start, end),
@@ -286,11 +287,11 @@ def _sources(start: str, end: str) -> list[dict]:
 def _top_content(start: str, end: str) -> list[dict]:
     with connect() as conn:
         rows = conn.execute(
-            """
+            f"""
             SELECT
                 e.url,
                 SUM(CASE WHEN e.event_type = 'page_view' THEN 1 ELSE 0 END) AS views,
-                SUM(CASE WHEN e.event_type != 'page_view' THEN 1 ELSE 0 END) AS actions
+                SUM(CASE WHEN e.event_type IN {CONVERSION_SQL} THEN 1 ELSE 0 END) AS actions
             FROM events e
             WHERE e.occurred_at >= ? AND e.occurred_at < ?
               AND e.url IS NOT NULL AND e.url != ''
@@ -442,8 +443,8 @@ def dashboard(period: str = "30d") -> dict:
     actions = _event_count(
         current_start,
         current_end,
-        "event_type != ?",
-        ("page_view",),
+        f"event_type IN {CONVERSION_SQL}",
+        (),
     )
 
     funnel = [
