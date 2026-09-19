@@ -7,17 +7,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import analytics, google_oauth, local_ai, setup_wizard, meta_oauth
+from . import analytics, google_oauth, insights, local_ai, setup_wizard, meta_oauth, social_business
 from .background import auto_sync_enabled, periodic_sync
 from .connectors.registry import diagnostics
 from .connectors.wordpress import WordPressConnector
 from .db import connector_states, initialize
 from .dashboard_service import dashboard
-from .sync import sync_all, sync_provider
+from .sync import restart_history, running_providers, sync_all, sync_provider
 
 app = FastAPI(
     title="GE360 Analitica API",
-    version="0.6.4",
+    version="0.8.0",
     description="API centrale per analytics, attribuzione e connettori GE360.",
 )
 
@@ -31,6 +31,9 @@ app.add_middleware(
 
 
 _sync_task: asyncio.Task | None = None
+
+
+_history_tasks: set = set()
 
 
 @app.on_event("startup")
@@ -55,7 +58,7 @@ async def shutdown() -> None:
 
 @app.get("/api/health")
 def health() -> dict:
-    return {"status": "ok", "service": "ge360-analitica", "version": "0.6.4"}
+    return {"status": "ok", "service": "ge360-analitica", "version": "0.8.0"}
 
 
 @app.get("/api/dashboard")
@@ -179,6 +182,93 @@ async def run_sync_provider(provider: str) -> dict:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Sync {provider} fallita: {exc}") from exc
+
+
+@app.post("/api/sync/{provider}/history")
+async def run_history(provider: str) -> dict:
+    """Riscarica tutto lo storico (GA4 18 mesi, Search Console 16, Business 18, Meta)."""
+    try:
+        result = await restart_history(provider)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    if result.get("started"):
+        async def _run() -> None:
+            try:
+                await sync_provider(provider)
+            except Exception:
+                # sync_provider registra già l'errore nello stato del connettore.
+                pass
+
+        _history_tasks.add(task := asyncio.create_task(_run()))
+        task.add_done_callback(_history_tasks.discard)
+    return result
+
+
+@app.get("/api/sync/running")
+def sync_running() -> dict:
+    return {"running": running_providers()}
+
+
+@app.get("/api/analytics/history")
+def analytics_history() -> list[dict]:
+    return insights.history_status()
+
+
+@app.get("/api/analytics/audience")
+def analytics_audience(days: int = Query(30, ge=1, le=730)) -> dict:
+    return insights.audience(days=days)
+
+
+@app.get("/api/analytics/journeys")
+def analytics_journeys(
+    days: int = Query(30, ge=1, le=730),
+    limit: int = Query(30, ge=1, le=200),
+) -> dict:
+    return insights.journeys(days=days, limit=limit)
+
+
+@app.get("/api/analytics/search/query-page")
+def analytics_query_page(
+    days: int = Query(90, ge=1, le=730),
+    contains: str = "",
+    device: str | None = None,
+    limit: int = Query(200, ge=1, le=2000),
+) -> list[dict]:
+    return insights.search_query_page(days=days, contains=contains, device=device, limit=limit)
+
+
+@app.get("/api/analytics/search/opportunities")
+def analytics_search_opportunities(
+    days: int = Query(90, ge=1, le=730),
+    min_impressions: int = Query(30, ge=1),
+    limit: int = Query(50, ge=1, le=500),
+) -> list[dict]:
+    return insights.search_opportunities(days=days, min_impressions=min_impressions, limit=limit)
+
+
+@app.get("/api/analytics/search/cannibalization")
+def analytics_cannibalization(
+    days: int = Query(90, ge=1, le=730),
+    min_impressions: int = Query(20, ge=1),
+    limit: int = Query(50, ge=1, le=500),
+) -> list[dict]:
+    return insights.cannibalization(days=days, min_impressions=min_impressions, limit=limit)
+
+
+@app.get("/api/analytics/meta/deep")
+def analytics_meta_deep(days: int = Query(30, ge=1, le=730)) -> dict:
+    return social_business.meta_deep(days=days)
+
+
+@app.get("/api/analytics/business")
+def analytics_business(days: int = Query(30, ge=1, le=730)) -> dict:
+    return social_business.business_overview(days=days)
+
+
+@app.get("/api/analytics/site-health")
+def analytics_site_health(days: int = Query(30, ge=1, le=730)) -> dict:
+    return insights.site_health(days=days)
 
 
 @app.get("/api/analytics/status")

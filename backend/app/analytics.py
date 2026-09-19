@@ -321,6 +321,15 @@ def anomalies(days: int = 7, threshold_percent: float = 30.0, limit: int = 30) -
             SELECT provider, metric, DATE(captured_at) AS day, SUM(value) AS daily_value
             FROM metric_snapshots
             WHERE captured_at >= ?
+              -- Una sola serie "totale" per metrica: senza questo filtro le
+              -- metriche scomposte per fonte, città, dispositivo, query...
+              -- verrebbero sommate più volte (e CTR/posizione sommati tra loro).
+              AND (
+                    dimension IS NULL
+                 OR (provider = 'search_console'
+                     AND dimension = 'device'
+                     AND metric IN ('search_clicks', 'search_impressions'))
+              )
             GROUP BY provider, metric, DATE(captured_at)
             ORDER BY day
             """,
@@ -373,20 +382,64 @@ def local_seo(days: int = 30, contains: str = "trieste", limit: int = 50) -> lis
                 provider,
                 dimension_value AS query,
                 metric,
-                SUM(value) AS value
-            FROM metric_snapshots
+                SUM(value) AS total,
+                -- per la posizione serve la media pesata sulle impression
+                SUM(CASE WHEN metric = 'search_position' THEN value * COALESCE((
+                    SELECT i.value FROM metric_snapshots i
+                    WHERE i.provider = m.provider
+                      AND i.metric = 'search_impressions'
+                      AND i.captured_at = m.captured_at
+                      AND i.dimension = m.dimension
+                      AND i.dimension_value = m.dimension_value
+                ), 0) ELSE 0 END) AS weighted
+            FROM metric_snapshots m
             WHERE captured_at >= ?
               AND provider IN ('search_console', 'google_business')
               AND LOWER(COALESCE(dimension, '')) = 'query'
               AND LOWER(COALESCE(dimension_value, '')) LIKE ?
             GROUP BY provider, dimension_value, metric
-            ORDER BY value DESC
-            LIMIT ?
             """,
-            (_cutoff(days), f"%{needle}%", limit),
+            (_cutoff(days), f"%{needle}%"),
         ).fetchall()
 
-    return [dict(row) for row in rows]
+    # Clic e impression si sommano; CTR e posizione no: si ricalcolano sul
+    # periodo (CTR = clic/impression, posizione media pesata sulle impression).
+    grouped: dict[tuple[str, str], dict[str, float]] = defaultdict(dict)
+    for row in rows:
+        values = grouped[(row["provider"], row["query"])]
+        values[row["metric"]] = float(row["total"] or 0)
+        if row["metric"] == "search_position":
+            values["_position_weighted"] = float(row["weighted"] or 0)
+
+    def _reach(item: tuple[tuple[str, str], dict[str, float]]) -> float:
+        values = item[1]
+        return values.get("search_impressions", values.get("gbp_search_keyword_impressions", 0))
+
+    output = []
+    # Query più viste per prime, con tutte le loro metriche vicine.
+    for (provider, query), values in sorted(grouped.items(), key=_reach, reverse=True):
+        if provider == "search_console":
+            impressions = values.get("search_impressions", 0)
+            clicks = values.get("search_clicks", 0)
+            if "search_ctr" in values:
+                values["search_ctr"] = clicks / impressions if impressions else 0
+            if "search_position" in values:
+                values["search_position"] = (
+                    values["_position_weighted"] / impressions if impressions else 0
+                )
+        for metric, value in values.items():
+            if metric.startswith("_"):
+                continue
+            output.append(
+                {
+                    "provider": provider,
+                    "query": query,
+                    "metric": metric,
+                    "value": round(value, 4),
+                }
+            )
+
+    return output[:limit]
 
 
 def meta_dashboard(days: int = 30) -> dict[str, Any]:

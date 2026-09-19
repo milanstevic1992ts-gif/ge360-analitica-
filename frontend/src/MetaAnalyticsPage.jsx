@@ -36,6 +36,11 @@ const LABELS = {
   meta_page_impressions_unique: 'Copertura Facebook',
   meta_page_engaged_users: 'Utenti coinvolti Facebook',
   meta_page_video_views: 'Video views Facebook',
+  meta_page_media_view: 'Visualizzazioni Facebook',
+  meta_page_total_media_view_unique: 'Persone raggiunte Facebook',
+  meta_page_daily_follows_unique: 'Nuovi follower Facebook',
+  instagram_follower_count: 'Nuovi follower Instagram',
+  instagram_profile_links_taps: 'Tap link profilo',
 }
 
 const nf = new Intl.NumberFormat('it-IT', { maximumFractionDigits: 0 })
@@ -75,6 +80,8 @@ function MetaAnalyticsPage({ days = 30, syncProvider, syncing }) {
       'instagram_views',
       'instagram_total_interactions',
       'meta_page_post_engagements',
+      'meta_page_media_view',
+      'meta_page_total_media_view_unique',
       'meta_page_views_total',
       'meta_page_impressions',
       'meta_page_engaged_users',

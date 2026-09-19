@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import LocalAIPage from './LocalAIPage'
 import MetaAnalyticsPage from './MetaAnalyticsPage'
+import { AudiencePage, HistoryPanel, JourneysPage, SearchDeepPage, SiteHealthPage } from './InsightPages'
+import { BusinessPage, MetaDeepPage } from './SocialBusinessPages'
 import SetupWizardPage from './SetupWizardPage'
 import {
   Activity,
@@ -13,12 +15,16 @@ import {
   ExternalLink,
   Gauge,
   Globe2,
+  HeartPulse,
+  Store,
   LayoutDashboard,
   Link2,
   Menu,
   MessageCircle,
   RefreshCw,
+  Route,
   Search,
+  SearchCheck,
   Settings2,
   Share2,
   Sparkles,
@@ -50,10 +56,15 @@ const nav = [
   { id: 'overview', label: 'Panoramica', icon: LayoutDashboard },
   { id: 'setup', label: 'Configurazione', icon: Settings2 },
   { id: 'acquisition', label: 'Acquisizione', icon: TrendingUp },
+  { id: 'audience', label: 'Pubblico', icon: Users },
+  { id: 'journeys', label: 'Percorsi', icon: Route },
   { id: 'content', label: 'Contenuti', icon: BarChart3 },
   { id: 'meta', label: 'Meta Analytics', icon: Share2 },
   { id: 'leads', label: 'Lead', icon: Target },
   { id: 'seo', label: 'SEO locale', icon: Search },
+  { id: 'search', label: 'Ricerca Google', icon: SearchCheck },
+  { id: 'health', label: 'Salute sito', icon: HeartPulse },
+  { id: 'business', label: 'Google Business', icon: Store },
   { id: 'connectors', label: 'Connettori', icon: Link2 },
   { id: 'local-ai', label: 'AI Locale', icon: Sparkles },
 ]
@@ -288,6 +299,11 @@ function App() {
         )}
 
         {activeView === 'acquisition' && <AcquisitionPage data={data} />}
+        {activeView === 'audience' && <AudiencePage days={days} />}
+        {activeView === 'journeys' && <JourneysPage days={days} />}
+        {activeView === 'search' && <SearchDeepPage days={days} />}
+        {activeView === 'health' && <SiteHealthPage days={days} />}
+        {activeView === 'business' && <BusinessPage days={days} />}
         {activeView === 'content' && <ContentPage data={data} items={contentPerformance} />}
         {activeView === 'meta' && (
           <MetaAnalyticsPage
@@ -296,6 +312,7 @@ function App() {
             syncing={syncing}
           />
         )}
+        {activeView === 'meta' && <MetaDeepPage days={days} />}
         {activeView === 'leads' && <LeadsPage summary={leadsSummary} recent={recentLeads} />}
         {activeView === 'seo' && <SeoPage rows={seoRows} anomalies={anomalyRows} />}
         {activeView === 'connectors' && (
@@ -310,6 +327,7 @@ function App() {
             actionMessage={actionMessage}
           />
         )}
+        {activeView === 'connectors' && <HistoryPanel />}
         {activeView === 'setup' && <SetupWizardPage onFinish={() => navigate('overview')} />}
         {activeView === 'local-ai' && <LocalAIPage days={days} dashboardMode={data?.mode} />}
       </main>

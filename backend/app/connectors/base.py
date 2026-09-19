@@ -10,6 +10,10 @@ class ConnectorResult:
     metrics: list[dict[str, Any]] = field(default_factory=list)
     events: list[dict[str, Any]] = field(default_factory=list)
     content_items: list[dict[str, Any]] = field(default_factory=list)
+    # Righe Search Console data+query+pagina+dispositivo (tabella dedicata).
+    search_rows: list[dict[str, Any]] = field(default_factory=list)
+    # Recensioni (Google Business): tabella dedicata, aggiornate per review_id.
+    reviews: list[dict[str, Any]] = field(default_factory=list)
     cursor: str | None = None
     message: str = ""
 

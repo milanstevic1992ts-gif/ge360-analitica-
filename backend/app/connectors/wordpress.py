@@ -1,3 +1,4 @@
+import json
 import html
 import os
 import re
@@ -29,6 +30,27 @@ def _plain_title(value: Any) -> str:
         value = value.get("rendered", "")
     value = html.unescape(str(value or ""))
     return _TAG_RE.sub("", value).strip()
+
+
+def _to_float(value: Any) -> float | None:
+    if value in (None, ""):
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _decode_payload(value: Any) -> dict[str, Any] | None:
+    if not value:
+        return None
+    if isinstance(value, dict):
+        return value
+    try:
+        decoded = json.loads(value)
+    except (TypeError, ValueError):
+        return None
+    return decoded if isinstance(decoded, dict) else None
 
 
 class WordPressConnector(Connector):
@@ -119,6 +141,12 @@ class WordPressConnector(Connector):
                         "content_id": event.get("content_id") or None,
                         "url": event.get("url") or None,
                         "occurred_at": _wp_datetime(event.get("occurred_at")),
+                        # Campi del tracker 0.2 (assenti con il tracker 0.1).
+                        "session_id": event.get("session_id") or None,
+                        "visitor_id": event.get("visitor_id") or None,
+                        "device": event.get("device") or None,
+                        "value": _to_float(event.get("value")),
+                        "payload": _decode_payload(event.get("payload")),
                     }
                 )
 
