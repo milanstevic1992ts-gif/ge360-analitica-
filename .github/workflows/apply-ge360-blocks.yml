@@ -73,8 +73,9 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Il token Actions non può modificare workflow: conserviamo quelli del ramo.
+          git checkout HEAD -- .github/workflows/ci.yml .github/workflows/apply-ge360-blocks.yml
           rm -rf .ge360-patch
-          rm -f .github/workflows/apply-ge360-blocks.yml
           git add -A
           git commit -m "feat: integrate GE360 analytics blocks 1-2 [skip ci]"
           git push origin HEAD:work/ge360-blocchi-1-2
